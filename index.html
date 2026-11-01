@@ -223,7 +223,9 @@ h1 span { color: var(--gold); }
 .click_wrap.audhide { opacity: 0.25; }
 .click_wrap img { display: block; }
 .click_wrap img.rating { width: 38px; height: 38px; }
+.click_wrap { position: relative; }
 .click_wrap img.verified { width: 20px; height: 20px; }
+.click_wrap img.modified { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; pointer-events: none; }
 .clickable { cursor: pointer; }
 img[src^="data:image/png"] { image-rendering: pixelated; }
 td img.clickable:hover { transform: scale(1.08); }
@@ -677,7 +679,7 @@ tr.cur td.blk .hour { color: #fff; }
   </div>
 
   <div id="edit_tools" hidden>
-    <p>Edit mode. Tap a rating to cycle it, or the small mark beside it to flag it as checked. Changes are saved in this browser only.</p>
+    <p>Edit mode. Tap a rating to cycle it. Tap the lock beside it once you have checked that rating in the game (it closes and turns gold), whether you changed it or not. A pink pencil marks a rating that differs from the default chart. Changes are saved in this browser only.</p>
     <button type="button" class="btn green" id="load_default"><b>Load chart</b><small>Fill with the default values</small></button>
     <button type="button" class="btn red" id="load_blank"><b>Start blank</b><small>All ratings will be erased</small></button>
   </div>
@@ -952,12 +954,20 @@ $(function () {
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAgCAYAAAAFQMh/AAABEUlEQVR4XuWWMQ6CQBBFWVwt7D2Jl/AAFtrYcAWP4RWstfAAFl7Bk9hbKLIGyCfw2YGQkAzJvoZkl+C+me9AFIWG6RN2zrm+e+oYY3qfmRMPeeiYtE4nGaZJt4g9+wsjVUDfmE3ZMN4sOyud3d+Nfa4Am0/HGKZubQuD+f5aXLPHwWv8e30a96XHrdd8MsZWSvFstShO/r3svOZsioogC9xz/A7M9XqMk6C39nQbc05UPUfK1Y3L6NZATxmkm/eldSDNO7Uet4yRZoD0AuxL60wWpa21HDXj8FJdGQOe1WBoqs2z7K30llLrscUkkWY2v5049dIs5zRP5u1UDZbwvkBAOF+ZElIFJDi9Emr/4/D4A28ok8465Iu0AAAAAElFTkSuQmCC',
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAgCAYAAAAFQMh/AAAAzUlEQVR4XmNkIBH8////PzYtjIyMjKQYxUSKYmoCnK7E5TMYkJzhCWY+z9iO1z24QmLw+Bjdp+g+g/G/3H+D4tPPnafBfJj8rehVYD4vLy+YRvf5gPmYBVcE4fIZsUCqxQmsFBYS6GDAfDxqMd3AgAU1zlSNDnjLTcFCPIoiWEOF1Fww+H0MA+glFiFxXGDAfIxRO+Eqq0n1GXqJNWjKapLrY0K1EzoYdPUxznyM7lJCLRIYwOXD0dppwPLxqMV0AwMW1ET3d4ZNPh55AAD94EhUKu08PwAAAABJRU5ErkJggg==',
   ];
-  // The verified "unknown" mark is a hollow circle so unchecked cells look unchecked.
-  const verified_unknown_src = badge('#8a93a0',
-    '<circle cx="24" cy="24" r="11" fill="none" stroke="#fff" stroke-width="4" stroke-dasharray="5 4"/>');
+  // The checked mark is a lock: closed and gold once you have checked the rating yourself,
+  // open and grey until then.
+  const lock_open_src = badge('#5a6169',
+    '<path d="M17 22v-6a7 7 0 0 1 13.6-2.3" fill="none" stroke="#cfd6da" stroke-width="4" stroke-linecap="round"/>' +
+    '<rect x="12" y="22" width="24" height="17" rx="3" fill="#cfd6da"/>');
+  const lock_closed_src = badge('#f2b21c',
+    '<path d="M17 22v-6a7 7 0 0 1 14 0v6" fill="none" stroke="#18283a" stroke-width="4"/>' +
+    '<rect x="12" y="22" width="24" height="17" rx="3" fill="#18283a"/><circle cx="24" cy="30" r="3" fill="#f2b21c"/>');
+  // Marks a rating that differs from the default chart.
+  const modified_src = badge('#d11ad1',
+    '<path d="M13 35l2-8 15-15 6 6-15 15z" fill="#fff"/><path d="M13 35l2-8 6 6z" fill="#18283a"/>');
   function icon(name, kind) {
-    if (kind === 'verified' && name === 'unknown') {
-      return verified_unknown_src;
+    if (kind === 'verified') {
+      return name === 'check' ? lock_closed_src : lock_open_src;
     }
     return icons[name];
   }
@@ -1090,10 +1100,15 @@ $(function () {
           (any_aud_selected && !aud_states[jj] ? ' audhide' : '') +
           '">' +
           (edit_mode ?
-            '<img src="' + icon(verified[elem[0]], 'verified') + '" alt="' + verified[elem[0]] + '" class="' + clickable + 'verified" id="verified_' + ii + '_' + jj + '">' :
+            '<img src="' + icon(verified[elem[0]], 'verified') + '" alt="' + (elem[0] ? 'checked' : 'not checked') + '" class="' + clickable + 'verified" id="verified_' + ii + '_' + jj + '"' +
+            ' title="' + (elem[0] ? 'Checked by you (tap to unlock)' : 'Not checked yet (tap to lock it as checked)') + '">' :
             '') +
           '<img src="' + icon(ratings[elem[1]]) + '" alt="' + (ratings[elem[1]] === 'unknown' ? 'not rated' : ratings[elem[1]].toUpperCase()) + '" class="' + clickable + 'rating"' +
-          ' id="rating_' + ii + '_' + jj + '"></div>';
+          ' id="rating_' + ii + '_' + jj + '">' +
+          // a rated cell that differs from the default chart gets a pencil mark
+          (edit_mode && elem[1] && default_data[ii] && elem[1] !== default_data[ii][jj][1] ?
+            '<img src="' + modified_src + '" alt="changed" class="modified" title="Changed from the default (' + ratings[default_data[ii][jj][1]].toUpperCase() + ')">' : '') +
+          '</div>';
         if (src === cache[ii + '_' + jj]) {
           return null;
         }
@@ -4273,7 +4288,12 @@ $(function () {
     setView(viewFromHash());
   });
   $('#load_default').on('click', function () {
-    writeLocal(JSON.stringify(default_data));
+    // The default values start unlocked: the lock is for ratings you checked yourself.
+    writeLocal(JSON.stringify(default_data.map(function (row) {
+      return row.map(function (c) {
+        return [0, c[1]];
+      });
+    })));
     getData();
   });
   $('#load_blank').on('click', function () {
