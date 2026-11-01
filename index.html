@@ -259,7 +259,7 @@ td img.clickable:hover { transform: scale(1.08); }
 #planner_src { font: 700 9px/1.4 var(--font-pixel); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 
 #planner_wrap { background: var(--black); border: 3px solid var(--slate-hi); box-shadow: 0 0 0 3px var(--black); }
-#planner_wrap table { border-collapse: separate; border-spacing: 3px 2px; width: 100%; min-width: 940px; background: var(--black); }
+#planner_wrap table { border-collapse: separate; border-spacing: 3px 2px; width: 100%; min-width: 720px; background: var(--black); }
 #planner_wrap th {
   padding: 8px 10px; text-align: left; background: var(--slate);
   box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.08), inset -2px -2px 0 rgba(0, 0, 0, 0.3);
@@ -355,6 +355,10 @@ td.mv.mv_r5 { background: var(--t5); }
 .lib { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: var(--slate); border: 2px solid var(--black); box-shadow: inset 0 0 0 2px var(--slate-hi); }
 .lib_top { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
 .lib_title { font: 700 13px/1 var(--font-pixel); letter-spacing: 0.08em; text-transform: uppercase; color: #fff; text-shadow: 2px 2px 0 #000; }
+#lib .lib_top .lib_title { cursor: pointer; user-select: none; }
+#lib .lib_top .lib_title::after { content: ' \25BE'; font-size: 12px; color: var(--soft); }
+#lib.shut .lib_top .lib_title::after { content: ' \25B8'; }
+#lib.shut .lib_hint, #lib.shut .lib_list { display: none; }
 .lib_hint { flex: 1 1 260px; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--soft); }
 .lib_add { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
 .lib_add select { min-width: 150px; padding: 8px 10px; font: 700 11px/1 var(--font-pixel); text-transform: uppercase; color: #fff; background: var(--black); border: 2px solid var(--slate-hi); }
@@ -496,12 +500,22 @@ td.mv.mv_r5 { background: var(--t5); }
 .kbadge { padding: 2px 5px; font: 700 8px/1 var(--font-pixel); color: #fff; background: var(--slate-hi); }
 .lib_buy:empty { display: none; }
 .lib_buy.busy, .gi_tbl .gain.busy { opacity: 0.5; }
-.lib_import { align-items: center; }
-.lib_import .sv_msg { flex: 1 1 240px; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--soft); }
+/* Load savegame: the first thing on the planner screen, and also a drop zone. */
+.lib_import {
+  display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center;
+  padding: 16px 18px; background: var(--slate); border: 2px solid var(--black); box-shadow: inset 0 0 0 2px var(--slate-hi);
+}
+.lib_import .btn.big { min-width: 260px; padding: 18px 26px; gap: 8px; }
+.lib_import .btn.big b { font-size: 20px; }
+.lib_import .btn.big small { font-size: 10px; }
+.lib_import .sv_msg { flex: 1 1 280px; min-width: 0; font-size: 15px; line-height: 1.45; color: var(--soft); }
 .lib_import .sv_msg.err { color: #ff8a7a; }
 .lib_import .sv_msg b { color: #fff; }
 .lib_import .btn.watching { background: var(--magenta); }
-.lib_import.drag { outline: 2px dashed var(--slate-hi); outline-offset: 4px; }
+.lib_import.drag { outline: 3px dashed var(--gold); outline-offset: -8px; }
+@media (max-width: 600px) {
+  .lib_import .btn.big { flex: 1 1 100%; min-width: 0; }
+}
 .buy_t { font: 700 10px/1 var(--font-pixel); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
 .buy_row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; background: rgba(242, 178, 28, 0.08); border: 2px solid rgba(242, 178, 28, 0.45); }
 .buy_row img { display: block; flex: none; }
@@ -512,7 +526,7 @@ td.mv.mv_r5 { background: var(--t5); }
 .bang { flex: none; font: 700 24px/1 var(--font-pixel); color: #e24ac8; text-shadow: 2px 2px 0 #000; }
 #planner_wrap td.aud { width: 200px; padding: 6px 8px; background: #1d2023; }
 .chips { display: flex; gap: 6px; flex-wrap: nowrap; }
-.chip { position: relative; flex: none; width: 32px; height: 33px; padding: 2px; background: transparent; border: 0; cursor: pointer; }
+.chip { position: relative; flex: none; width: 32px; height: 33px; padding: 2px; background: transparent; border: 0; }
 .chip img { display: block; width: 28px; height: 29px; image-rendering: pixelated; }
 .chip.s0 { opacity: 0.35; filter: grayscale(1); }
 .chip.s1 { box-shadow: 0 0 0 2px var(--soft); }
@@ -521,14 +535,12 @@ td.mv.mv_r5 { background: var(--t5); }
   content: ""; position: absolute; inset: 0;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23d8262c' stroke-width='3'/%3E%3Cpath d='M5.6 18.4L18.4 5.6' stroke='%23d8262c' stroke-width='3'/%3E%3C/svg%3E") center / 92% no-repeat;
 }
-.chip:disabled { opacity: 0.15; filter: grayscale(1); cursor: not-allowed; box-shadow: none; }
+.chip.off { opacity: 0.15; filter: grayscale(1); box-shadow: none; }
 
 #planner tr[data-b] { cursor: pointer; }
-#planner_wrap tr.cur td.blk { background: var(--magenta); }
 tr.past td.blk { opacity: 0.55; }
-tr.past .chip { cursor: not-allowed; }
-tr.past .chip.s1:disabled { opacity: 0.85; filter: none; box-shadow: 0 0 0 2px var(--muted); }
-tr.past .chip.s2:disabled { opacity: 0.7; filter: none; box-shadow: 0 0 0 2px var(--red); }
+tr.past .chip.s1.off { opacity: 0.85; filter: none; box-shadow: 0 0 0 2px var(--muted); }
+tr.past .chip.s2.off { opacity: 0.7; filter: none; box-shadow: 0 0 0 2px var(--red); }
 td.mv { position: relative; }
 .pin_sel {
   position: absolute; top: 3px; right: 3px; z-index: 1; width: 24px; height: 22px; padding: 0;
@@ -557,9 +569,6 @@ tr.cur .now_tag { color: #fff; }
 .nowbox small { font: 700 9px/1.1 var(--font-pixel); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .nowbox select { padding: 8px 6px; font: 700 13px/1 var(--font-pixel); color: #fff; background: var(--black); border: 2px solid var(--gold); }
 .nowbox .nb { width: 28px; height: 32px; padding: 0; font: 700 18px/1 var(--font-pixel); color: #fff; background: var(--slate-hi); border: 2px solid var(--black); cursor: pointer; }
-#planner_wrap td.ideal { width: 190px; }
-#planner_wrap td.mv.ideal { box-shadow: inset 0 0 0 3px rgba(11, 12, 13, 0.4); }
-#planner_wrap td.ideal_none { width: 190px; background: #17191b; }
 .btn.big { min-width: 280px; max-width: min(100%, 420px); padding: 16px 28px; gap: 8px; }
 .btn.big b { font-size: 20px; }
 .btn.big small { font-size: 10px; line-height: 1.3; }
@@ -617,7 +626,6 @@ tr.cur .cut_tag { color: #fff; }
 .nowbox .nb:disabled { opacity: 0.35; cursor: not-allowed; }
 .clock-ic { width: 22px; height: 22px; flex: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23f2b21c' stroke-width='3'/%3E%3Cpath d='M12 7v5l3 3' stroke='%23f2b21c' stroke-width='3' fill='none'/%3E%3C/svg%3E") center / contain no-repeat; }
 tr.cur td.blk .hour { color: #fff; }
-#planner_wrap tr.cur td.aud { background: #2f2233; box-shadow: inset 0 0 0 3px var(--magenta); }
 .key {
   position: absolute; right: -1px; bottom: -1px; padding: 1px 2px; pointer-events: none;
   font: 700 8px/1 var(--font-pixel); color: #fff; background: rgba(11, 12, 13, 0.85);
@@ -662,6 +670,13 @@ tr.cur td.blk .hour { color: #fff; }
   </div>
 
   <div class="ptools" id="planner_tools" hidden>
+    <div class="lib_import" id="sv_drop">
+      <button type="button" class="btn green big" id="sv_btn"><b>Load savegame</b><small>Reloads when the game saves</small></button>
+      <input id="sv_file" type="file" accept=".etv" hidden>
+      <button type="button" class="btn slate slim" id="sv_watch" hidden><b>Watch save folder</b><small>Reload when the game saves</small></button>
+      <button type="button" class="btn slate slim" id="sv_resume" hidden><b>Resume watching</b><small id="sv_resume_nm"></small></button>
+      <span class="sv_msg" id="sv_msg">Pick or drop your <b>saveGame-N.etv</b> to load your day, movies and audiences from the game, or watch the <b>savegames</b> folder to follow the game as it saves.</span>
+    </div>
     <div class="daybar" role="group" aria-label="Days">
       <div class="sbar" id="sbar" role="status" aria-live="polite">
         <span class="sb_day"><small>Day</small><b id="day_num">1</b></span>
@@ -671,62 +686,6 @@ tr.cur td.blk .hour { color: #fff; }
         <span class="sb_it"><b id="sb_tv">0</b><small>TV shows</small></span>
       </div>
     </div>
-    <div class="toolbar">
-      <div class="seg" role="group" aria-label="Fit preference">
-        <button type="button" id="fit_long" class="on">Longest first</button>
-        <button type="button" id="fit_best">Best per hour</button>
-      </div>
-      <div class="timerow">
-        <div class="nowbox cutbox">
-          <span class="cut-ic" aria-hidden="true"></span>
-          <label for="cut_hour"><small>Cut at</small></label>
-          <select id="cut_hour" aria-label="Cut hour: movies must end at this hour" title="Every movie must end at or before this hour"></select>
-        </div>
-        <div class="bans"><span class="ban-ic" aria-hidden="true"></span><b id="bans_left">3</b><small>Bans<br>left</small>
-          <span class="ban_sep" aria-hidden="true"></span><small>Per<br>day</small>
-          <div class="seg mini" role="group" aria-label="Bans per day">
-            <button type="button" class="ban_max" data-n="1">1</button>
-            <button type="button" class="ban_max" data-n="2">2</button>
-            <button type="button" class="ban_max" data-n="3">3</button>
-          </div>
-          <button type="button" class="btn slate slim" id="unban_all"><b>Unban all</b></button>
-        </div>
-        <div class="nowbox">
-          <span class="clock-ic" aria-hidden="true"></span>
-          <label for="now_hour"><small>Now</small></label>
-          <button type="button" class="nb" id="now_prev" aria-label="Previous hour">&lsaquo;</button>
-          <select id="now_hour" aria-label="Current hour"></select>
-          <button type="button" class="nb" id="now_next" aria-label="Next hour">&rsaquo;</button>
-        </div>
-      </div>
-      <button type="button" class="btn green" id="auto_ban"><b>Auto ban</b><small>Find the best bans for me</small></button>
-      <button type="button" class="btn red" id="clear_day"><b>Clear day</b><small>Reset hours, bans and events</small></button>
-    </div>
-    <div class="gi" id="gi" hidden>
-      <div class="gi_head"><span class="lib_title">From your savegame</span><span class="gi_src" id="gi_src"></span></div>
-      <div class="gi_grid">
-        <section class="gi_card" id="gi_quest"></section>
-        <section class="gi_card" id="gi_news"></section>
-        <section class="gi_card" id="gi_fans"></section>
-      </div>
-      <section class="gi_card gi_wide" id="gi_ads"></section>
-      <section class="gi_card gi_wide" id="gi_market"></section>
-    </div>
-    <div class="lib">
-      <div class="lib_top">
-        <span class="lib_title">My movies</span>
-        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): Mid ones count a bit less and Low ones much less, so a fresh movie of another genre can take their slot. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 (children avoid it), XXX (only from 23.00), Glamour, Cartoon and Anime.</span>
-      </div>
-      <div class="lib_add lib_import" id="sv_drop">
-        <button type="button" class="btn green slim" id="sv_btn"><b>Load savegame</b><small>Reloads when the game saves</small></button>
-        <input id="sv_file" type="file" accept=".etv" hidden>
-        <button type="button" class="btn slate slim" id="sv_watch" hidden><b>Watch save folder</b><small>Reload when the game saves</small></button>
-        <button type="button" class="btn slate slim" id="sv_resume" hidden><b>Resume watching</b><small id="sv_resume_nm"></small></button>
-        <span class="sv_msg" id="sv_msg">Pick or drop your <b>saveGame-N.etv</b> to load your day, movies and audiences from the game, or watch the <b>savegames</b> folder to follow the game as it saves.</span>
-      </div>
-      <div class="lib_list" id="lib_list"></div>
-    </div>
-    <span id="planner_src"></span>
   </div>
 
   <div class="ptools" id="studio_tools" hidden>
@@ -771,6 +730,59 @@ tr.cur td.blk .hour { color: #fff; }
       </div>
     </div>
     <div class="grid-wrap" id="studio_wrap" hidden></div>
+  </div>
+
+  <!-- Planner controls, savegame info and the movie list sit below the planner chart. -->
+  <div class="ptools" id="planner_below" hidden>
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="Fit preference">
+        <button type="button" id="fit_long" class="on">Longest first</button>
+        <button type="button" id="fit_best">Best per hour</button>
+      </div>
+      <div class="timerow">
+        <div class="nowbox cutbox">
+          <span class="cut-ic" aria-hidden="true"></span>
+          <label for="cut_hour"><small>Cut at</small></label>
+          <select id="cut_hour" aria-label="Cut hour: movies must end at this hour" title="Every movie must end at or before this hour"></select>
+        </div>
+        <div class="bans"><span class="ban-ic" aria-hidden="true"></span><b id="bans_left">3</b><small>Bans<br>left</small>
+          <span class="ban_sep" aria-hidden="true"></span><small>Per<br>day</small>
+          <div class="seg mini" role="group" aria-label="Bans per day">
+            <button type="button" class="ban_max" data-n="1">1</button>
+            <button type="button" class="ban_max" data-n="2">2</button>
+            <button type="button" class="ban_max" data-n="3">3</button>
+          </div>
+          <button type="button" class="btn slate slim" id="unban_all"><b>Unban all</b></button>
+        </div>
+        <div class="nowbox">
+          <span class="clock-ic" aria-hidden="true"></span>
+          <label for="now_hour"><small>Now</small></label>
+          <button type="button" class="nb" id="now_prev" aria-label="Previous hour">&lsaquo;</button>
+          <select id="now_hour" aria-label="Current hour"></select>
+          <button type="button" class="nb" id="now_next" aria-label="Next hour">&rsaquo;</button>
+        </div>
+      </div>
+      <button type="button" class="btn green" id="auto_ban"><b>Auto ban</b><small>Find the best bans for me</small></button>
+      <button type="button" class="btn red" id="clear_day"><b>Clear day</b><small>Reset hours, bans and events</small></button>
+    </div>
+    <div class="gi" id="gi" hidden>
+      <div class="gi_head"><span class="lib_title">From your savegame</span><span class="gi_src" id="gi_src"></span></div>
+      <div class="gi_grid">
+        <section class="gi_card" id="gi_quest"></section>
+        <section class="gi_card" id="gi_news"></section>
+        <section class="gi_card" id="gi_fans"></section>
+      </div>
+      <section class="gi_card gi_wide" id="gi_ads"></section>
+      <section class="gi_card gi_wide" id="gi_market"></section>
+    </div>
+    <div class="lib" id="lib">
+      <div class="lib_top">
+        <span class="lib_title">My movies</span>
+        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): Mid ones count a bit less and Low ones much less, so a fresh movie of another genre can take their slot. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 (children avoid it), XXX (only from 23.00), Glamour, Cartoon and Anime.</span>
+      </div>
+      <div class="lib_list" id="lib_list"></div>
+    </div>
+    <span id="planner_src"></span>
   </div>
 
   <footer class="foot">
@@ -1256,6 +1268,10 @@ $(function () {
       event: PLAN_HOURS.map(function () {
         return false;
       }),
+      // Hours the game gives to the AEFTA awards: always an event, with no movie.
+      award: PLAN_HOURS.map(function () {
+        return false;
+      }),
       aud: PLAN_HOURS.map(function () {
         return audiences.map(function () {
           return 0;
@@ -1280,6 +1296,9 @@ $(function () {
         return typeof x === 'string' ? x : null;
       }) : PLAN_HOURS.map(function () {
         return null;
+      });
+      p.award = Array.isArray(p.award) && p.award.length === PLAN_HOURS.length ? p.award.map(Boolean) : PLAN_HOURS.map(function () {
+        return false;
       });
       p.frozen = Array.isArray(p.frozen) ? p.frozen.filter(function (s) {
         return s && s.start >= 0 && s.start < PLAN_HOURS.length && s.len >= 1 && s.len <= 3;
@@ -1946,36 +1965,6 @@ $(function () {
       '<span class="mv_s">' + sub + '</span>' +
       '</div>' + pin + '</td>';
   }
-  // The ideal plan ignores your movie list: any genre, any length (3, then 2, then 1 blocks),
-  // still respecting events, the cut and the hours that already aired.
-  function idealSlots(masks, scorer) {
-    const end = lockEnd();
-    const blocked = plan.event.map(function (e, i) {
-      return e || i < end;
-    });
-    return buildSlots(masks, solvePlan(masks, blocked, plan.mode, scorer), scorer, blocked);
-  }
-  function idealCell(s, scorer, same) {
-    const rs = s.len > 1 ? ' rowspan="' + s.len + '"' : '';
-    const span = hourLabel(PLAN_HOURS[s.start]) + ' to ' + hourLabel(PLAN_HOURS[s.start + s.len - 1]);
-    const info = scorer(s.mask);
-    if (!info) {
-      return '<td class="mv empty ideal"' + rs + ' title="' + span + '"><div class="mv_in mv_c">' +
-        '<span class="mv_t">&mdash;</span><span class="mv_s">No audience yet</span></div></td>';
-    }
-    const b = info.best;
-    const sub = blocksLabel(s.len) + (same ? ' &middot; planned' : '');
-    const face = '<img class="face" src="' + icons[ratings[b.weak]] + '" alt="Weakest rating ' + ratingAlt(b.weak) + '" title="Weakest rating: ' + ratingAlt(b.weak) + '">';
-    const tip = 'Ideal for ' + span + ': ' + genres[b.gi];
-    if (s.len === 1) {
-      return '<td class="mv rated ideal mv_r' + b.weak + '" title="' + tip + '"><div class="mv_in mv_one">' +
-        '<img class="g" src="' + genre_icons[b.gi] + '" alt="">' +
-        '<span class="mv_txt"><span class="mv_t">' + genres[b.gi] + '</span><span class="mv_s">' + sub + '</span></span>' + face + '</div></td>';
-    }
-    return '<td class="mv rated ideal mv_r' + b.weak + '"' + rs + ' title="' + tip + '"><div class="mv_in mv_c">' +
-      '<span class="mv_pics"><img src="' + genre_icons[b.gi] + '" alt="">' + face + '</span>' +
-      '<span class="mv_t">' + genres[b.gi] + '</span><span class="mv_s">' + sub + '</span></div></td>';
-  }
   let lib_on_air = [];
   let editing = -1;
   function renderLibrary(day, masks, scorer) {
@@ -2195,23 +2184,8 @@ $(function () {
       '<th><div class="th_in">Blocks<span class="q" title="Hours of the day. Mark one as Event when a fixed event takes it.">?</span></div></th>' +
       '<th><div class="th_in">Movies<span class="q" title="' + (plan.movies.length ? 'Your movies, placed where they score best. Each one airs once.' : 'The best genre for each movie slot, packed 3, then 2, then 1 blocks.') + '">?</span></div></th>' +
       '<th><div class="th_in">Audience<span class="q" title="The audiences watching each hour, from your savegame.">?</span></div></th>' +
-      '<th><div class="th_in">Ideal<span class="q" title="The best plan if you owned every movie: any genre and any length (3, then 2, then 1 blocks), respecting events and the cut.">?</span></div></th>' +
       '</tr>'];
     const lock = lockEnd();
-    const planned = {};
-    slots.forEach(function (s) {
-      if (!s.ev && s.gi !== null) {
-        planned[s.start + '|' + s.len] = s.gi;
-      }
-    });
-    const ideal_at = {};
-    const ideal_cover = {};
-    idealSlots(masks, scorer).forEach(function (s) {
-      ideal_at[s.start] = s;
-      for (let k = 0; k < s.len; ++k) {
-        ideal_cover[s.start + k] = true;
-      }
-    });
     for (let b = 0; b < PLAN_HOURS.length; ++b) {
       const ev = plan.event[b];
       const past = b < plan.now;
@@ -2219,8 +2193,12 @@ $(function () {
       let tr = '<tr data-b="' + b + '"' + (row_cls ? ' class="' + row_cls.trim() + '"' : '') + '><td class="blk"><span class="hour">' + hourLabel(PLAN_HOURS[b]) + '</span>' +
         (b === plan.now && plan.now > 0 ? '<span class="now_tag">Now</span>' : '') +
         (b === plan.cut ? '<span class="cut_tag">Cut</span>' : '') +
-        '<button type="button" class="evt" data-b="' + b + '" aria-pressed="' + ev + '"' + (b < lock ? ' disabled' : '') + '>Event</button></td>';
-      if (ev) {
+        '<button type="button" class="evt" data-b="' + b + '" aria-pressed="' + ev + '"' + (b < lock || plan.award[b] ? ' disabled' : '') + '>' + (plan.award[b] ? 'Awards' : 'Event') + '</button></td>';
+      if (plan.award[b]) {
+        tr += '<td class="mv ev"><div class="mv_in"><span class="mv_icon"></span><span class="mv_txt">' +
+          '<span class="mv_t">AEFTA awards</span><span class="mv_s">Set by the game &middot; no movie or show</span></span>' +
+          '<span class="bang" aria-hidden="true">!</span></div></td>';
+      } else if (ev) {
         const em = plan.movies[movieIndex(plan.event_mv[b])];
         tr += '<td class="mv ev"><div class="mv_in"><span class="mv_icon">' + (em ? '<img src="' + genre_icons[em.g] + '" alt="">' : '') + '</span><span class="mv_txt">' +
           '<span class="mv_t">Event' + (em ? ' &middot; ' + esc(em.name || genres[em.g]) : '') + '</span>' +
@@ -2240,19 +2218,13 @@ $(function () {
       for (let oi = 0; oi < order.length; ++oi) {
         const a = order[oi];
         const st = plan.aud[b][a];
-        tr += '<button type="button" class="chip s' + st + '" data-b="' + b + '" data-a="' + a + '"' +
+        tr += '<span class="chip s' + st + (ev || past ? ' off' : '') + '" role="img"' +
           ' aria-label="' + audiences[a] + ' at ' + hourLabel(PLAN_HOURS[b]) + ': ' + state_name[st] + '"' +
-          ' title="' + audiences[a] + ' (' + state_name[st] + '), key ' + audiences[a].charAt(0).toUpperCase() + '"' + (ev || past ? ' disabled' : '') + '>' +
+          ' title="' + audiences[a] + ' (' + state_name[st] + ')">' +
           '<img src="' + icon(audiences[a]) + '" alt="">' +
-          '<span class="key" aria-hidden="true">' + audiences[a].charAt(0).toUpperCase() + '</span></button>';
+          '<span class="key" aria-hidden="true">' + audiences[a].charAt(0).toUpperCase() + '</span></span>';
       }
       tr += '</div></td>';
-      if (ideal_at[b]) {
-        const info = scorer(ideal_at[b].mask);
-        tr += idealCell(ideal_at[b], scorer, !!info && planned[b + '|' + ideal_at[b].len] === info.best.gi);
-      } else if (!ideal_cover[b]) {
-        tr += '<td class="ideal_none"></td>';
-      }
       tr += '</tr>';
       html.push(tr);
     }
@@ -2700,19 +2672,29 @@ $(function () {
   // tomorrow): AUdayAudience0/1/2 hold the audience groups of each hour (3 per hour, -1 for
   // none, same M W C E L R A G order as here) and AUdayBlock holds 3 days x 3 channels x 12
   // hours of blocks (movie, part number, bans, and bBlocked once the hour has aired).
-  // actBlock is the hour the game is at.
+  // actBlock is the hour the game is at. bBlockAwards marks the hours the AEFTA awards take.
+  // Once every hour left today already has a movie, there is nothing left to plan, so
+  // tomorrow is planned instead (its audiences and awards are already in the save).
   const SAVE_TODAY = 1;
   function importToday(root, pn, all) {
     const hours = PLAN_HOURS.length;
-    const aud = nrbfList(root['AUdayAudience' + SAVE_TODAY]);
     const blocks = nrbfList(root.AUdayBlock);
-    const res = {ok: false, locked: 0, bans: 0};
+    const act = Math.max(0, Math.min(hours - 1, root.actBlock | 0));
+    const dayRow = function (d) {
+      const row0 = d * 3 * hours + pn * hours;
+      return blocks.slice(row0, row0 + hours);
+    };
+    const today_set = dayRow(SAVE_TODAY).every(function (blk, b) {
+      return b < act || blk && (blk.bMovie >= 0 || blk.bBlockAwards);
+    });
+    const d = today_set && nrbfList(root['AUdayAudience' + (SAVE_TODAY + 1)]).length >= hours * 3 ? SAVE_TODAY + 1 : SAVE_TODAY;
+    const aud = nrbfList(root['AUdayAudience' + d]);
+    const res = {ok: false, locked: 0, bans: 0, awards: 0, tomorrow: d !== SAVE_TODAY};
     if (aud.length < hours * 3) {
       return res;
     }
     res.ok = true;
-    const row0 = SAVE_TODAY * 3 * hours + pn * hours;
-    const mine = blocks.slice(row0, row0 + hours);
+    const mine = dayRow(d);
     plan.aud = PLAN_HOURS.map(function (h, b) {
       const row = audiences.map(function () {
         return 0;
@@ -2733,7 +2715,7 @@ $(function () {
       return row;
     });
     // Lock what has aired (or is airing): one frozen slot per movie, from its first part.
-    const now = Math.max(0, Math.min(hours - 1, root.actBlock | 0));
+    const now = res.tomorrow ? 0 : act;
     const frozen = [];
     mine.forEach(function (blk, b) {
       if (!blk || !blk.bBlocked || !(blk.bMovie >= 0) || (blk.bNumeral | 0) > 1 && b > 0) {
@@ -2760,8 +2742,15 @@ $(function () {
     plan.pins = plan.pins.filter(function (x) {
       return x.start >= now;
     });
+    plan.award = mine.map(function (blk) {
+      return !!(blk && blk.bBlockAwards);
+    });
+    res.awards = plan.award.filter(Boolean).length;
     plan.event = plan.event.map(function (e, b) {
-      return b >= now && e;
+      return plan.award[b] || b >= now && e;
+    });
+    plan.event_mv = plan.event_mv.map(function (x, b) {
+      return plan.award[b] ? null : x;
     });
     if (cursor < now) {
       cursor = now;
@@ -3087,7 +3076,7 @@ $(function () {
       }).join('') + '</table></div>';
     $('#gi_market').html(html);
   }
-  // Tapping a card's title folds it; which cards are folded is remembered in this browser.
+  // Tapping a card's title (or My movies) folds it; which cards are folded is remembered in this browser.
   const GI_SHUT_KEY = 'empiretv_gi_shut';
   let gi_shut = {};
   try {
@@ -3095,11 +3084,11 @@ $(function () {
   } catch (e) {
     gi_shut = {};
   }
-  $('#gi .gi_card').each(function () {
+  $('#gi .gi_card, #lib').each(function () {
     $(this).toggleClass('shut', !!gi_shut[this.id]);
   });
-  $('#gi').on('click', '.gi_card > h3', function () {
-    const card = $(this).parent().toggleClass('shut');
+  $('#gi, #lib').on('click', '.gi_card > h3, .lib_top > .lib_title', function () {
+    const card = $(this).closest('.gi_card, #lib').toggleClass('shut');
     gi_shut[card.attr('id')] = card.hasClass('shut');
     try {
       localStorage.setItem(GI_SHUT_KEY, JSON.stringify(gi_shut));
@@ -3169,6 +3158,9 @@ $(function () {
     plan.save = {day: root.tDay | 0, channel: channel, operator: String(root['p' + pn + 'pName'] || ''), color: col[0], light: col[1]};
     plan.movies = sortMovies(list);
     const today = importToday(root, pn, all);
+    if (today.tomorrow) {
+      plan.save.day += 1;
+    }
     setSaveInfo(buildSaveInfo(root, pn, all));
     plan.pins = plan.pins.filter(function (x) {
       return ids.indexOf(x.id) >= 0;
@@ -3187,6 +3179,10 @@ $(function () {
     };
     return '<b>' + esc(root['p' + pn + 'pChannelName'] || 'Your channel') + '</b>, day ' + root.tDay + ' ' + pad(root.tHours | 0) + ':' + pad(root.tMinutes | 0) + ': loaded ' +
       (list.length - tvs) + ' movies and ' + tvs + ' TV shows' + (skipped ? ' (' + skipped + ' skipped)' : '') + '. ' +
+      (today.tomorrow ? 'Today is fully programmed, so this plans tomorrow (day ' + plan.save.day + '). ' : '') +
+      (today.awards ? 'The AEFTA awards take ' + today.awards + ' hour' + (today.awards > 1 ? 's' : '') + ' (' + plan.award.map(function (a, b) {
+        return a ? hourLabel(PLAN_HOURS[b]) : null;
+      }).filter(Boolean).join(', ') + '). ' : '') +
       (today.ok ? 'Audiences filled for all ' + PLAN_HOURS.length + ' hours' + (today.locked ? ', ' + today.locked + ' aired hour' + (today.locked > 1 ? 's' : '') + ' locked' : '') +
         (today.bans ? ', ' + today.bans + ' ban' + (today.bans > 1 ? 's' : '') + ' from the game' : '') + '.' : 'No audience data for today in this save.');
   }
@@ -3453,22 +3449,6 @@ $(function () {
   }
   showForm();
 
-  $('#planner_wrap').on('click', '.chip', function () {
-    const b = Number($(this).attr('data-b'));
-    const a = Number($(this).attr('data-a'));
-    cursor = b;
-    remember();
-    const row = plan.aud[b];
-    if (row[a] === 0) {
-      row[a] = 1;
-    } else if (row[a] === 1) {
-      row[a] = plan.max_bans - bansUsed() > 0 ? 2 : 0;
-    } else {
-      row[a] = 0;
-    }
-    savePlan();
-    renderPlanner();
-  });
   $('#planner_wrap').on('change', '.pin_sel', function () {
     const b = Number($(this).attr('data-b'));
     const id = this.value || null;
@@ -3487,7 +3467,7 @@ $(function () {
   });
   $('#planner_wrap').on('click', '.evt', function () {
     const b = Number($(this).attr('data-b'));
-    if (b < lockEnd()) {
+    if (b < lockEnd() || plan.award[b]) {
       return;
     }
     cursor = b;
@@ -3607,11 +3587,15 @@ $(function () {
     const mode = plan.mode;
     const movies = plan.movies;
     const max_bans = plan.max_bans;
+    const award = plan.award;
     cursor = 0;
     plan = blankPlan();
     plan.mode = mode;
     plan.movies = movies;
     plan.max_bans = max_bans;
+    // The awards come from the game, so clearing the day keeps them.
+    plan.award = award;
+    plan.event = award.slice();
     history = [];
     savePlan();
     renderPlanner();
@@ -3843,43 +3827,14 @@ $(function () {
       return;
     }
     if (key === 'Enter') {
-      // other buttons keep their own Enter behaviour; a focused portrait passes Enter on
-      if (key === 'Enter' && target && target.tagName === 'BUTTON' && !$(target).hasClass('chip')) {
+      // buttons keep their own Enter behaviour
+      if (target && target.tagName === 'BUTTON') {
         return;
       }
       ev.preventDefault();
       moveCursor(ev.shiftKey ? -1 : 1);
       return;
     }
-    if (!key || key.length !== 1 || ev.repeat || plan.event[cursor] || cursor < plan.now) {
-      return;
-    }
-    const letter = key.toLowerCase();
-    const a = audiences.findIndex(function (name) {
-      return name.charAt(0) === letter;
-    });
-    if (a < 0) {
-      return;
-    }
-    ev.preventDefault();
-    remember();
-    const row = plan.aud[cursor];
-    const st = row[a];
-    if (ev.shiftKey) {
-      if (st === 1 && plan.max_bans - bansUsed() > 0) {
-        row[a] = 2;
-      } else if (st === 2) {
-        row[a] = 1;
-      }
-    } else {
-      row[a] = st === 0 ? 1 : 0;
-    }
-    if (row[a] === st) {
-      history.pop();
-      return;
-    }
-    savePlan();
-    renderPlanner();
   });
 
   // ---- Studio --------------------------------------------------------------
@@ -4117,6 +4072,7 @@ $(function () {
     $('#studio_tools').prop('hidden', view !== 'studio');
     $('#studio_wrap').prop('hidden', view !== 'studio');
     $('#planner_tools').prop('hidden', view !== 'planner');
+    $('#planner_below').prop('hidden', view !== 'planner');
     $('#planner_wrap').prop('hidden', view !== 'planner');
     $('#plan_area').prop('hidden', view !== 'planner');
     if (view === 'planner') {
