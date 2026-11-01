@@ -290,6 +290,11 @@ td.mv.tone_b { background: #aedbea; color: #1a74a3; }
 td.mv.empty { background: #2b2e31; color: var(--muted); }
 #planner_wrap td.mv.empty { box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.06), inset -2px -2px 0 rgba(0, 0, 0, 0.3); }
 td.mv.ev { background: #2f4b5f; color: #fff; }
+/* AEFTA awards: a red carpet hour. */
+#planner_wrap td.mv.mv_award { background: #9e1b2c; box-shadow: inset 0 0 0 3px #e2334a, inset 0 0 0 5px #5c0c17; }
+td.mv.mv_award .mv_s { color: #ffd0d6; }
+td.mv.mv_award .bang { color: #ffd34d; }
+.evt.evt_award, .evt.evt_award:disabled { background: #9e1b2c; border-color: #e2334a; color: #fff; opacity: 1; }
 td.mv.rated { color: var(--ink); }
 td.mv.mv_r0 { background: var(--t0); }
 td.mv.mv_r1 { background: var(--t1); }
@@ -781,7 +786,7 @@ tr.cur td.blk .hour { color: #fff; }
     <div class="lib" id="lib">
       <div class="lib_top">
         <span class="lib_title">My movies</span>
-        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): only High ones (70% and up) count in full, so a Mid or Low movie airs only when no fresh one fits. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 (children avoid it), XXX (only from 23.00), Glamour, Cartoon and Anime.</span>
+        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): a movie's score is multiplied by its freshness (40% fresh counts 40%), and below 70% it loses the length bonus. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 and XXX (never while children watch; XXX only from 23.00), Glamour, Cartoon and Anime.</span>
       </div>
       <div class="lib_list" id="lib_list"></div>
     </div>
@@ -1530,8 +1535,16 @@ $(function () {
     ['#e4985b', 1], ['#5252a1', 0], ['#5b5b5d', 0], ['#835317', 0], ['#6a6a6a', 0], ['#d12da5', 0],
     ['#b4b4b5', 1], ['#6e6e78', 0], ['#dc1921', 0], ['#0c7634', 0], ['#fb6200', 1], ['#189748', 0],
   ];
-  // Only High (70% and up) counts in full; a Mid or Low movie airs only when nothing fresh fits.
-  const FRESH_FACTOR = [0.15, 0.4, 1];
+  // Freshness multiplies a movie's score, as in the game: 10000 viewers at 40% freshness
+  // count as 4000. Movies without an exact freshness (not from a savegame) use their level.
+  const FRESH_FACTOR = [0.2, 0.5, 1];
+  function freshOf(m) {
+    return hasFp(m) ? m.fp / 100 : FRESH_FACTOR[m.f];
+  }
+  // Below High (70%) a movie is stale: it never gets the length bonus of "Longest first".
+  function isStale(fr) {
+    return fr < 0.7;
+  }
   // ---- Movie tags ---------------------------------------------------------------
   // Each tag changes how well an audience group takes the movie, in percent of that group's
   // rating, and some tags raise the whole audience. Levels: huge 50, big 25, bonus 10,
@@ -1630,10 +1643,21 @@ $(function () {
     return (min * 100 + sum) * audienceBonus(ty.tags, mask, ty.eps | 0);
   }
   function movieSig(m) {
-    return [m.g, m.len, m.f, m.tags | 0, epsOf(m)].join('.');
+    return [m.g, m.len, m.f, freshOf(m), m.tags | 0, epsOf(m)].join('.');
   }
-  function startOk(m, b) {
-    return !((m.tags | 0) & TAG_XXX) || b >= XXX_START;
+  // +16 and XXX movies cannot air while children are watching (a ban on children lifts that).
+  const ADULT_TAGS = TAG_P16 | TAG_XXX;
+  function kidsIn(b, len) {
+    for (let k = 0; k < len; ++k) {
+      const row = plan.aud[b + k];
+      if (row && row[CHILDREN] === 1) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function startOk(m, b, len) {
+    return (!((m.tags | 0) & TAG_XXX) || b >= XXX_START) && !((m.tags | 0) & ADULT_TAGS && kidsIn(b, len || m.len));
   }
   function tagShorts(m) {
     const list = TAGS.filter(function (t) {
@@ -1693,7 +1717,7 @@ $(function () {
       const key = movieSig(m);
       if (!(key in at)) {
         at[key] = pool.length;
-        pool.push({g: m.g, len: m.len, f: m.f, tags: m.tags | 0, eps: epsOf(m), ratings: []});
+        pool.push({g: m.g, len: m.len, f: m.f, fr: freshOf(m), tags: m.tags | 0, eps: epsOf(m), ratings: []});
       }
       pool[at[key]].ratings.push(movieRating(m));
     });
@@ -1704,7 +1728,7 @@ $(function () {
     });
     // A fixed order keeps ties between equal plans resolved the same way every time.
     pool.sort(function (x, y) {
-      return x.g - y.g || x.len - y.len || x.f - y.f || x.tags - y.tags || x.eps - y.eps;
+      return x.g - y.g || x.len - y.len || x.fr - y.fr || x.tags - y.tags || x.eps - y.eps;
     });
     return pool;
   }
@@ -1734,9 +1758,9 @@ $(function () {
             }
             mask |= masks[i + k];
           }
-          if (ok) {
+          if (ok && !((ty.tags & ADULT_TAGS) && (mask & (1 << CHILDREN)))) {
             const sc = typeScore(scorer, mask, ty);
-            v = sc === null ? null : sc * FRESH_FACTOR[ty.f];
+            v = sc === null ? null : sc * ty.fr;
             seg_mask[i * 4 + len] = mask;
           }
         }
@@ -1751,7 +1775,7 @@ $(function () {
         for (let t = 0; t < T; ++t) {
           const b = base[t][i];
           if (b !== null && cs[t]) {
-            const r = slotValueScore(mode, pool[t].len, b * rateFactor(pool[t].ratings[0]), pool[t].f < 2) + rel[i + pool[t].len];
+            const r = slotValueScore(mode, pool[t].len, b * rateFactor(pool[t].ratings[0]), isStale(pool[t].fr)) + rel[i + pool[t].len];
             if (r > v) {
               v = r;
             }
@@ -1786,7 +1810,7 @@ $(function () {
         const b = base[t][i];
         if (b !== null && cs[t]) {
           const ty = pool[t];
-          const val = slotValueScore(mode, ty.len, b * rateFactor(ty.ratings[ty.ratings.length - cs[t]]), ty.f < 2);
+          const val = slotValueScore(mode, ty.len, b * rateFactor(ty.ratings[ty.ratings.length - cs[t]]), isStale(ty.fr));
           cand.push({t: t, val: val, opt: val + rel[i + ty.len]});
         }
       }
@@ -1832,8 +1856,8 @@ $(function () {
       }
       const ty = pool[t];
       const mask = seg_mask[i * 4 + ty.len];
-      slots.push({start: i, len: ty.len, mask: mask, gi: ty.g, f: ty.f, tags: ty.tags, eps: ty.eps,
-        q: typeScore(scorer, mask, ty) * ty.len * FRESH_FACTOR[ty.f] * rateFactor(ty.ratings[ty.ratings.length - cs[t]]), lib: true});
+      slots.push({start: i, len: ty.len, mask: mask, gi: ty.g, f: ty.f, fr: ty.fr, tags: ty.tags, eps: ty.eps,
+        q: typeScore(scorer, mask, ty) * ty.len * ty.fr * rateFactor(ty.ratings[ty.ratings.length - cs[t]]), lib: true});
       cs[t]--;
       i += ty.len;
     }
@@ -2096,7 +2120,7 @@ $(function () {
   function cleanPlanRefs() {
     const used = frozenIds();
     plan.event_mv = plan.event_mv.map(function (id, b) {
-      if (!id || !plan.event[b] || movieIndex(id) < 0 || used[id]) {
+      if (!id || !plan.event[b] || movieIndex(id) < 0 || used[id] || !startOk(plan.movies[movieIndex(id)], b, 1)) {
         return null;
       }
       used[id] = true;
@@ -2156,7 +2180,7 @@ $(function () {
         return false;
       }
       if (for_event) {
-        return true;
+        return startOk(m, b, 1);
       }
       if (crossesCut(b, m.len) || !startOk(m, b)) {
         return false;
@@ -2210,7 +2234,7 @@ $(function () {
       const mask = unionMask(p.start, m.len);
       const info = scorer(mask);
       return {start: p.start, len: m.len, mask: mask, gi: m.g, f: m.f, lib: true, mi: mi, pinned: true,
-        q: info ? typeScore(scorer, mask, {g: m.g, tags: m.tags | 0, eps: epsOf(m)}) * m.len * FRESH_FACTOR[m.f] * rateFactor(movieRating(m)) : 0};
+        q: info ? typeScore(scorer, mask, {g: m.g, tags: m.tags | 0, eps: epsOf(m)}) * m.len * freshOf(m) * rateFactor(movieRating(m)) : 0};
     });
     const evs = [];
     plan.event_mv.forEach(function (id, b) {
@@ -2225,7 +2249,7 @@ $(function () {
       if (s.lib && s.gi !== null) {
         // the best rated free copy goes first, as the planner assumed
         plan.movies.forEach(function (m, i) {
-          if (!taken[i] && m.g === s.gi && m.len === s.len && m.f === s.f && (m.tags | 0) === (s.tags | 0) && epsOf(m) === (s.eps | 0) &&
+          if (!taken[i] && m.g === s.gi && m.len === s.len && m.f === s.f && freshOf(m) === s.fr && (m.tags | 0) === (s.tags | 0) && epsOf(m) === (s.eps | 0) &&
             (s.mi < 0 || movieRating(m) > movieRating(plan.movies[s.mi]))) {
             s.mi = i;
           }
@@ -2268,9 +2292,9 @@ $(function () {
       let tr = '<tr data-b="' + b + '"' + (row_cls ? ' class="' + row_cls.trim() + '"' : '') + '><td class="blk"><span class="hour">' + hourLabel(PLAN_HOURS[b]) + '</span>' +
         (b === plan.now && plan.now > 0 ? '<span class="now_tag">Now</span>' : '') +
         (b === plan.cut ? '<span class="cut_tag">Cut</span>' : '') +
-        '<button type="button" class="evt" data-b="' + b + '" aria-pressed="' + ev + '"' + (b < lock || plan.award[b] ? ' disabled' : '') + '>' + (plan.award[b] ? 'Awards' : 'Event') + '</button></td>';
+        '<button type="button" class="evt' + (plan.award[b] ? ' evt_award' : '') + '" data-b="' + b + '" aria-pressed="' + ev + '"' + (b < lock || plan.award[b] ? ' disabled' : '') + '>' + (plan.award[b] ? 'Awards' : 'Event') + '</button></td>';
       if (plan.award[b]) {
-        tr += '<td class="mv ev"><div class="mv_in"><span class="mv_icon"></span><span class="mv_txt">' +
+        tr += '<td class="mv ev mv_award"><div class="mv_in"><span class="mv_icon"></span><span class="mv_txt">' +
           '<span class="mv_t">AEFTA awards</span><span class="mv_s">Set by the game &middot; no movie or show</span></span>' +
           '<span class="bang" aria-hidden="true">!</span></div></td>';
       } else if (ev) {
@@ -2984,14 +3008,14 @@ $(function () {
     const pool = libPool();
     const eps = (mo.tags & TAG_TV) ? mo.eps : 0;
     let t = pool.findIndex(function (ty) {
-      return ty.g === mo.g && ty.len === mo.len && ty.f === mo.f && ty.tags === mo.tags && ty.eps === eps;
+      return ty.g === mo.g && ty.len === mo.len && ty.fr === freshOf(mo) && ty.tags === mo.tags && ty.eps === eps;
     });
     if (t >= 0) {
       pool[t] = Object.assign({}, pool[t], {ratings: pool[t].ratings.concat([mo.r]).sort(function (a, b) {
         return b - a;
       })});
     } else {
-      pool.push({g: mo.g, len: mo.len, f: mo.f, tags: mo.tags, eps: eps, ratings: [mo.r]});
+      pool.push({g: mo.g, len: mo.len, f: mo.f, fr: freshOf(mo), tags: mo.tags, eps: eps, ratings: [mo.r]});
     }
     const r = solveLibrary(masks, blockedHours(), plan.mode, scorer, pool);
     return dayQuality(r.slots) - base_q;
