@@ -679,7 +679,7 @@ tr.cur td.blk .hour { color: #fff; }
   </div>
 
   <div id="edit_tools" hidden>
-    <p>Edit mode. Tap a rating to cycle it. Tap the lock beside it once you have checked that rating in the game (it closes and turns gold), whether you changed it or not. A pink pencil marks a rating that differs from the default chart. Changes are saved in this browser only.</p>
+    <p>Edit mode. Tap a rating to cycle it. Tick the box beside it once you have checked that rating in the game (it turns green), whether you changed it or not. A pink pencil marks a rating that differs from the default chart. Changes are saved in this browser only.</p>
     <button type="button" class="btn green" id="load_default"><b>Load chart</b><small>Fill with the default values</small></button>
     <button type="button" class="btn red" id="load_blank"><b>Start blank</b><small>All ratings will be erased</small></button>
   </div>
@@ -813,18 +813,18 @@ tr.cur td.blk .hour { color: #fff; }
 $(function () {
   const local_storage_key = 'empiretv_edit_data';
   const default_data = [
-    [[1,5],[1,2],[1,3],[1,3],[1,1],[1,4],[1,4],[1,3]],
-    [[1,3],[1,5],[1,4],[1,1],[1,3],[1,2],[1,3],[1,2]],
-    [[1,3],[1,2],[1,2],[1,5],[1,1],[1,3],[1,4],[1,4]],
-    [[1,1],[1,5],[1,2],[1,4],[1,4],[1,2],[1,4],[1,2]],
-    [[1,3],[1,2],[1,5],[1,1],[1,3],[1,4],[1,1],[1,5]],
-    [[1,2],[1,4],[1,3],[1,4],[1,4],[1,3],[1,3],[1,3]],
-    [[1,4],[1,3],[1,1],[1,2],[1,4],[1,5],[1,2],[1,3]],
-    [[1,1],[1,4],[1,3],[1,3],[1,4],[1,5],[1,2],[1,1]],
-    [[1,2],[1,4],[1,2],[1,4],[1,5],[1,2],[1,3],[1,1]],
-    [[1,4],[1,1],[1,4],[1,2],[1,3],[1,3],[1,2],[1,5]],
-    [[1,5],[1,3],[1,3],[1,3],[1,3],[1,2],[1,5],[1,2]],
-    [[1,4],[1,1],[1,3],[1,5],[1,2],[1,3],[1,2],[1,4]],
+    [[0,5],[0,2],[0,3],[0,3],[0,1],[0,4],[0,4],[0,3]],
+    [[0,3],[0,5],[0,4],[0,1],[0,3],[0,2],[0,3],[0,2]],
+    [[0,3],[0,2],[0,2],[0,5],[0,1],[0,3],[0,4],[0,4]],
+    [[0,1],[0,5],[0,2],[0,4],[0,4],[0,2],[0,4],[0,2]],
+    [[0,3],[0,2],[0,5],[0,1],[0,3],[0,4],[0,1],[0,5]],
+    [[0,2],[0,4],[0,3],[0,4],[0,4],[0,3],[0,3],[0,3]],
+    [[0,4],[0,3],[0,1],[0,2],[0,4],[0,5],[0,2],[0,3]],
+    [[0,1],[0,4],[0,3],[0,3],[0,4],[0,5],[0,2],[0,1]],
+    [[0,2],[0,4],[0,2],[0,4],[0,5],[0,2],[0,3],[0,1]],
+    [[0,4],[0,1],[0,4],[0,2],[0,3],[0,3],[0,2],[0,5]],
+    [[0,5],[0,3],[0,3],[0,3],[0,3],[0,2],[0,5],[0,2]],
+    [[0,4],[0,1],[0,3],[0,5],[0,2],[0,3],[0,2],[0,4]],
   ];
   // Edit mode is on when the page address ends in #edit.
   function viewFromHash() {
@@ -954,20 +954,19 @@ $(function () {
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAgCAYAAAAFQMh/AAABEUlEQVR4XuWWMQ6CQBBFWVwt7D2Jl/AAFtrYcAWP4RWstfAAFl7Bk9hbKLIGyCfw2YGQkAzJvoZkl+C+me9AFIWG6RN2zrm+e+oYY3qfmRMPeeiYtE4nGaZJt4g9+wsjVUDfmE3ZMN4sOyud3d+Nfa4Am0/HGKZubQuD+f5aXLPHwWv8e30a96XHrdd8MsZWSvFstShO/r3svOZsioogC9xz/A7M9XqMk6C39nQbc05UPUfK1Y3L6NZATxmkm/eldSDNO7Uet4yRZoD0AuxL60wWpa21HDXj8FJdGQOe1WBoqs2z7K30llLrscUkkWY2v5049dIs5zRP5u1UDZbwvkBAOF+ZElIFJDi9Emr/4/D4A28ok8465Iu0AAAAAElFTkSuQmCC',
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAgCAYAAAAFQMh/AAAAzUlEQVR4XmNkIBH8////PzYtjIyMjKQYxUSKYmoCnK7E5TMYkJzhCWY+z9iO1z24QmLw+Bjdp+g+g/G/3H+D4tPPnafBfJj8rehVYD4vLy+YRvf5gPmYBVcE4fIZsUCqxQmsFBYS6GDAfDxqMd3AgAU1zlSNDnjLTcFCPIoiWEOF1Fww+H0MA+glFiFxXGDAfIxRO+Eqq0n1GXqJNWjKapLrY0K1EzoYdPUxznyM7lJCLRIYwOXD0dppwPLxqMV0AwMW1ET3d4ZNPh55AAD94EhUKu08PwAAAABJRU5ErkJggg==',
   ];
-  // The checked mark is a lock: closed and gold once you have checked the rating yourself,
-  // open and grey until then.
-  const lock_open_src = badge('#5a6169',
-    '<path d="M17 22v-6a7 7 0 0 1 13.6-2.3" fill="none" stroke="#cfd6da" stroke-width="4" stroke-linecap="round"/>' +
-    '<rect x="12" y="22" width="24" height="17" rx="3" fill="#cfd6da"/>');
-  const lock_closed_src = badge('#f2b21c',
-    '<path d="M17 22v-6a7 7 0 0 1 14 0v6" fill="none" stroke="#18283a" stroke-width="4"/>' +
-    '<rect x="12" y="22" width="24" height="17" rx="3" fill="#18283a"/><circle cx="24" cy="30" r="3" fill="#f2b21c"/>');
+  // The checked mark is a checkbox: ticked and green once you have checked the rating
+  // yourself, empty until then.
+  const check_off_src = badge('#5a6169',
+    '<rect x="11" y="11" width="26" height="26" rx="3" fill="none" stroke="#cfd6da" stroke-width="4"/>');
+  const check_on_src = badge('#1b7a31',
+    '<rect x="11" y="11" width="26" height="26" rx="3" fill="#fff"/>' +
+    '<path d="M16 24l6 6 11-12" fill="none" stroke="#1b7a31" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>');
   // Marks a rating that differs from the default chart.
   const modified_src = badge('#d11ad1',
     '<path d="M13 35l2-8 15-15 6 6-15 15z" fill="#fff"/><path d="M13 35l2-8 6 6z" fill="#18283a"/>');
   function icon(name, kind) {
     if (kind === 'verified') {
-      return name === 'check' ? lock_closed_src : lock_open_src;
+      return name === 'check' ? check_on_src : check_off_src;
     }
     return icons[name];
   }
@@ -1067,6 +1066,21 @@ $(function () {
         } catch (e) {
           result = [];
         }
+        // Ticks saved before they meant "checked by you" came from the default chart, so
+        // they are cleared once.
+        try {
+          if (!remote_edit && result.length && !localStorage.empiretv_checks_v2) {
+            result.forEach(function (row) {
+              row.forEach(function (c) {
+                c[0] = 0;
+              });
+            });
+            writeLocal(JSON.stringify(result));
+          }
+          localStorage.empiretv_checks_v2 = '1';
+        } catch (e) {
+          // without storage there is nothing old to clear
+        }
         if (!result.length) {
           result = [];
           for (let ii = 0; ii < genres.length; ++ii) {
@@ -1101,7 +1115,7 @@ $(function () {
           '">' +
           (edit_mode ?
             '<img src="' + icon(verified[elem[0]], 'verified') + '" alt="' + (elem[0] ? 'checked' : 'not checked') + '" class="' + clickable + 'verified" id="verified_' + ii + '_' + jj + '"' +
-            ' title="' + (elem[0] ? 'Checked by you (tap to unlock)' : 'Not checked yet (tap to lock it as checked)') + '">' :
+            ' title="' + (elem[0] ? 'Checked by you (tap to clear)' : 'Not checked yet (tap once you checked it)') + '">' :
             '') +
           '<img src="' + icon(ratings[elem[1]]) + '" alt="' + (ratings[elem[1]] === 'unknown' ? 'not rated' : ratings[elem[1]].toUpperCase()) + '" class="' + clickable + 'rating"' +
           ' id="rating_' + ii + '_' + jj + '">' +
@@ -4288,7 +4302,7 @@ $(function () {
     setView(viewFromHash());
   });
   $('#load_default').on('click', function () {
-    // The default values start unlocked: the lock is for ratings you checked yourself.
+    // The default values start unchecked: the tick is for ratings you checked yourself.
     writeLocal(JSON.stringify(default_data.map(function (row) {
       return row.map(function (c) {
         return [0, c[1]];
