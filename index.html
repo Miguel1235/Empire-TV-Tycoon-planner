@@ -363,7 +363,12 @@ td.mv.mv_r5 { background: var(--t5); }
 #lib .lib_top .lib_title { cursor: pointer; user-select: none; }
 #lib .lib_top .lib_title::after { content: ' \25BE'; font-size: 12px; color: var(--soft); }
 #lib.shut .lib_top .lib_title::after { content: ' \25B8'; }
-#lib.shut .lib_hint, #lib.shut .lib_list { display: none; }
+#lib.shut .lib_hint, #lib.shut .lib_list, #lib.shut .lib_buy { display: none; }
+.lib_buy .buy_t { font: 700 10px/1.2 var(--font-pixel); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); }
+.lib_buy ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lib_buy li { display: flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 13px; color: var(--soft); background: var(--black); border: 2px solid var(--slate-hi); }
+.lib_buy li img { width: 20px; height: auto; }
+.lib_buy li b { color: #fff; }
 .lib_hint { flex: 1 1 260px; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--soft); }
 .lib_add { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
 .lib_add select { min-width: 150px; padding: 8px 10px; font: 700 11px/1 var(--font-pixel); text-transform: uppercase; color: #fff; background: var(--black); border: 2px solid var(--slate-hi); }
@@ -786,8 +791,9 @@ tr.cur td.blk .hour { color: #fff; }
     <div class="lib" id="lib">
       <div class="lib_top">
         <span class="lib_title">My movies</span>
-        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): a movie's score is multiplied by its freshness (40% fresh counts 40%), and below 70% it loses the length bonus. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 and XXX (never while children watch; XXX only from 23.00), Glamour, Cartoon and Anime.</span>
+        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): a movie's score is multiplied by its freshness (40% fresh counts 40%), and below 70% it loses the length bonus. Hours where the weakest audience rates B or A count far more than average ones, so the plan goes for very good hours even if another hour ends up bad. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 and XXX (never while children watch; XXX only from 23.00), Glamour, Cartoon and Anime.</span>
       </div>
+      <div class="lib_buy" id="lib_buy"></div>
       <div class="lib_list" id="lib_list"></div>
     </div>
     <span id="planner_src"></span>
@@ -1252,12 +1258,13 @@ $(function () {
     });
     return blocked;
   }
+  // By genre name, then rating from high to low (unrated last), then by title.
   function sortMovies(list) {
     list.sort(function (a, b) {
-      const ka = a.name || genres[a.g];
-      const kb = b.name || genres[b.g];
-      return ka.localeCompare(kb, undefined, {sensitivity: 'base', numeric: true}) ||
-        a.g - b.g || a.len - b.len || b.f - a.f;
+      const ra = typeof a.r === 'number' ? a.r : -1;
+      const rb = typeof b.r === 'number' ? b.r : -1;
+      return genres[a.g].localeCompare(genres[b.g]) || rb - ra ||
+        (a.name || '').localeCompare(b.name || '', undefined, {sensitivity: 'base', numeric: true}) || a.len - b.len || b.f - a.f;
     });
     return list;
   }
@@ -1418,8 +1425,23 @@ $(function () {
     }
     return {d: default_data, src: 'the chart defaults'};
   }
-  // Ranked genres for a set of audiences (bitmask). Same scoring as the chart:
-  // weakest rating first, then the sum of ratings.
+  // Value of the weakest audience's rating (capped at B). B and up is worth far more than C or
+  // worse, so the plan goes for very good hours and accepts a bad hour where it has to,
+  // instead of spreading out average ones. E 0, D 0.5, C 1.5, B (and A) 6.
+  function tierValue(v) {
+    if (v <= 1) {
+      return 0;
+    }
+    if (v <= 2) {
+      return (v - 1) * 0.5;
+    }
+    if (v <= 3) {
+      return 0.5 + (v - 2);
+    }
+    return 1.5 + (Math.min(v, 4) - 3) * 4.5;
+  }
+  // Ranked genres for a set of audiences (bitmask): value of the weakest rating first, then
+  // the sum of ratings.
   function makeScorer(d) {
     // With fan weights d is a scaled copy; d.raw keeps the A-E ratings for display.
     const raw = d.raw || d;
@@ -1444,7 +1466,7 @@ $(function () {
             weak = Math.min(weak, raw[gi][a][1]);
           }
         }
-        list.push({gi: gi, score: min * 100 + sum, weak: weak});
+        list.push({gi: gi, score: tierValue(min) * 100 + sum, weak: weak});
       }
       const by_gi = list.slice();
       list.sort(function (x, y) {
@@ -1640,7 +1662,7 @@ $(function () {
         sum += v;
       }
     }
-    return (min * 100 + sum) * audienceBonus(ty.tags, mask, ty.eps | 0);
+    return (tierValue(min) * 100 + sum) * audienceBonus(ty.tags, mask, ty.eps | 0);
   }
   function movieSig(m) {
     return [m.g, m.len, m.f, freshOf(m), m.tags | 0, epsOf(m)].join('.');
@@ -2066,7 +2088,52 @@ $(function () {
   }
   let lib_on_air = [];
   let editing = -1;
+  // Genres worth buying: the hours still to plan that only get C or worse, and the genres
+  // that would rate B or better there. The genre that would lift the most hours comes first.
+  function renderBuyTips(day, scorer) {
+    const lock = lockEnd();
+    const need = genres.map(function () {
+      return 0;
+    });
+    let weak_hours = 0;
+    day.slots.forEach(function (s) {
+      if (s.ev || s.frozen || s.start < lock || !s.mask) {
+        return;
+      }
+      const info = scorer(s.mask);
+      if (!info || s.gi !== null && info.byGi[s.gi].weak >= 4) {
+        return;
+      }
+      weak_hours += s.len;
+      info.byGi.forEach(function (e) {
+        if (e.weak >= 4) {
+          need[e.gi] += s.len;
+        }
+      });
+    });
+    const fresh = genres.map(function (g, gi) {
+      return plan.movies.filter(function (m) {
+        return m.g === gi && freshOf(m) >= 0.7;
+      }).length;
+    });
+    const tips = need.map(function (n, gi) {
+      return {gi: gi, n: n};
+    }).filter(function (t) {
+      return t.n > 0;
+    }).sort(function (x, y) {
+      return y.n - x.n || fresh[x.gi] - fresh[y.gi] || x.gi - y.gi;
+    }).slice(0, 4);
+    if (!plan.movies.length || !weak_hours) {
+      $('#lib_buy').html(plan.movies.length ? '<span class="buy_t">Every hour left today gets a B or better</span>' : '');
+      return;
+    }
+    $('#lib_buy').html('<span class="buy_t">Buy for variety</span>' + (tips.length ? '<ul>' + tips.map(function (t) {
+      return '<li>' + gIcon(t.gi) + '<b>' + genres[t.gi] + '</b> B or better in ' + t.n + ' of ' + weak_hours + ' weak hour' + (weak_hours > 1 ? 's' : '') +
+        ' &middot; you have ' + fresh[t.gi] + ' fresh</li>';
+    }).join('') + '</ul>' : '<span class="gi_note">No genre gets a B or better in the ' + weak_hours + ' weak hour' + (weak_hours > 1 ? 's' : '') + ' left today.</span>'));
+  }
   function renderLibrary(day, masks, scorer) {
+    renderBuyTips(day, scorer);
     if (!plan.movies.length) {
       lib_on_air = [];
       $('#lib_list').html('<span class="lib_empty">Load a savegame to see your movies. Until then the planner picks the best genre for every slot.</span>');
