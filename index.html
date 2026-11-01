@@ -554,6 +554,9 @@ td.mv { position: relative; }
 .mv_one .mv_txt { padding-right: 18px; }
 .ev .pin_sel { position: static; flex: none; }
 td.mv.mv_pin { box-shadow: inset 0 0 0 3px var(--magenta); }
+#planner_wrap td.mv.mv_quest { box-shadow: inset 0 0 0 4px var(--gold), inset 0 0 0 6px var(--black); }
+#planner_wrap td.mv.mv_quest.mv_pin { box-shadow: inset 0 0 0 4px var(--gold), inset 0 0 0 7px var(--magenta); }
+.mv_quest .qbadge { display: inline-block; margin: 0 0 4px; }
 .pin_ic { display: inline-block; width: 9px; height: 10px; margin-right: 5px; vertical-align: -1px; background: currentColor;
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 1h6v2l-1 1v3l2 2v1H9v5H7v-5H4V9l2-2V4L5 3z'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5 1h6v2l-1 1v3l2 2v1H9v5H7v-5H4V9l2-2V4L5 3z'/%3E%3C/svg%3E") center / contain no-repeat; }
@@ -1907,7 +1910,73 @@ $(function () {
   }
   // One merged cell per movie: it spans every hour the movie takes and is tinted
   // with the color of its weakest rating.
-  function slotRow(s, scorer) {
+  // The slot that completes today's quest: the one on air at the quest's hour with a movie
+  // (not a TV show) the savegame lists as fitting it. -1 when none does.
+  function questSlot(slots) {
+    const q = save_info && save_info.quest;
+    if (!q || !plan.save) {
+      return -1;
+    }
+    const fits = {};
+    q.owned.forEach(function (mo) {
+      if (!(mo.tags & TAG_TV)) {
+        fits[mo.name] = true;
+      }
+    });
+    const at = PLAN_HOURS.indexOf(q.hour);
+    let found = -1;
+    slots.forEach(function (s) {
+      const name = s.ev || s.gi === null ? '' : s.lib && s.mi >= 0 ? plan.movies[s.mi].name : s.frozen ? s.name : '';
+      if (name && fits[name] && s.start <= at && at < s.start + s.len) {
+        found = s.start;
+      }
+    });
+    return found;
+  }
+  // When the plan leaves today's quest undone but a fitting movie can still be on air at the
+  // quest's hour, the best day with that movie placed there is used instead.
+  function questDay(masks, scorer, day) {
+    const q = save_info && save_info.quest;
+    if (!q || !plan.save || questSlot(day.slots) >= 0) {
+      return day;
+    }
+    const fits = {};
+    q.owned.forEach(function (mo) {
+      if (!(mo.tags & TAG_TV)) {
+        fits[mo.name] = true;
+      }
+    });
+    const at = PLAN_HOURS.indexOf(q.hour);
+    const pins = plan.pins.slice();
+    let best = null;
+    let best_q = -Infinity;
+    for (let b = Math.max(lockEnd(), at - 2); at >= 0 && b <= at; ++b) {
+      pinChoices(b, false).forEach(function (i) {
+        const m = plan.movies[i];
+        if (!fits[m.name] || b + m.len <= at) {
+          return;
+        }
+        plan.pins = pins.concat([{start: b, id: m.id}]);
+        const d = fullDay(masks, scorer);
+        const dq = dayQuality(d.slots);
+        if (dq > best_q) {
+          best_q = dq;
+          best = {day: d, id: m.id};
+        }
+      });
+    }
+    plan.pins = pins;
+    if (!best) {
+      return day;
+    }
+    best.day.slots.forEach(function (s) {
+      if (s.pinned && s.mi >= 0 && plan.movies[s.mi].id === best.id) {
+        s.pinned = false;
+      }
+    });
+    return best.day;
+  }
+  function slotRow(s, scorer, quest) {
     const pin = s.frozen ? '' : pinSelect(s.start, s.pinned && s.mi >= 0 ? plan.movies[s.mi].id : null, false);
     const span = hourLabel(PLAN_HOURS[s.start]) + ' to ' + hourLabel(PLAN_HOURS[s.start + s.len - 1]);
     const blocks = blocksLabel(s.len);
@@ -1953,14 +2022,16 @@ $(function () {
       sub = blocks + ' &middot; ' + sub_one;
     }
     const face = '<img class="face" src="' + icons[ratings[e.weak]] + '" alt="Weakest rating ' + ratingAlt(e.weak) + '" title="Weakest rating: ' + ratingAlt(e.weak) + '">';
+    const qcls = quest ? ' mv_quest' : '';
+    const qtag = quest ? '<span class="qbadge" title="This movie completes today\'s quest">Quest</span> ' : '';
     if (s.len === 1) {
-      return '<td class="mv rated mv_r' + e.weak + (s.frozen ? ' mv_lock' : '') + (s.pinned ? ' mv_pin' : '') + '" title="' + span + '"><div class="mv_in mv_one">' +
+      return '<td class="mv rated mv_r' + e.weak + (s.frozen ? ' mv_lock' : '') + (s.pinned ? ' mv_pin' : '') + qcls + '" title="' + span + '"><div class="mv_in mv_one">' +
         '<img class="g" src="' + genre_icons[s.gi] + '" alt="">' +
-        '<span class="mv_txt"><span class="mv_t">' + title + '</span>' +
+        '<span class="mv_txt"><span class="mv_t">' + qtag + title + '</span>' +
         '<span class="mv_s">' + sub_one + '</span></span>' + face + '</div>' + pin + '</td>';
     }
-    return '<td class="mv rated mv_r' + e.weak + (s.frozen ? ' mv_lock' : '') + (s.pinned ? ' mv_pin' : '') + '"' + rs + ' title="' + span + '"><div class="mv_in mv_c">' +
-      '<span class="mv_pics"><img src="' + genre_icons[s.gi] + '" alt="">' + face + '</span>' +
+    return '<td class="mv rated mv_r' + e.weak + (s.frozen ? ' mv_lock' : '') + (s.pinned ? ' mv_pin' : '') + qcls + '"' + rs + ' title="' + span + '"><div class="mv_in mv_c">' +
+      qtag + '<span class="mv_pics"><img src="' + genre_icons[s.gi] + '" alt="">' + face + '</span>' +
       '<span class="mv_t">' + title + '</span>' +
       '<span class="mv_s">' + sub + '</span>' +
       '</div>' + pin + '</td>';
@@ -2167,7 +2238,7 @@ $(function () {
     const rt = plannerRatings();
     const scorer = makeScorer(scoreRatings(rt.d));
     const masks = blockMasks();
-    const day = fullDay(masks, scorer);
+    const day = questDay(masks, scorer, fullDay(masks, scorer));
     const slots = day.slots;
     const slot_of = {};
     slots.forEach(function (s, si) {
@@ -2186,6 +2257,7 @@ $(function () {
       '<th><div class="th_in">Audience<span class="q" title="The audiences watching each hour, from your savegame.">?</span></div></th>' +
       '</tr>'];
     const lock = lockEnd();
+    const quest_at = questSlot(slots);
     for (let b = 0; b < PLAN_HOURS.length; ++b) {
       const ev = plan.event[b];
       const past = b < plan.now;
@@ -2206,7 +2278,7 @@ $(function () {
           (past ? '' : pinSelect(b, plan.event_mv[b], true)) +
           '<span class="bang" aria-hidden="true">!</span></div></td>';
       } else if (slot_of[b] && slot_of[b].k === 0) {
-        tr += slotRow(slot_of[b].s, scorer);
+        tr += slotRow(slot_of[b].s, scorer, slot_of[b].s.start === quest_at);
       }
       tr += '<td class="aud"><div class="chips">';
       // Only the marked and banned audiences of the hour are shown.
@@ -2672,29 +2744,20 @@ $(function () {
   // tomorrow): AUdayAudience0/1/2 hold the audience groups of each hour (3 per hour, -1 for
   // none, same M W C E L R A G order as here) and AUdayBlock holds 3 days x 3 channels x 12
   // hours of blocks (movie, part number, bans, and bBlocked once the hour has aired).
-  // actBlock is the hour the game is at. bBlockAwards marks the hours the AEFTA awards take.
-  // Once every hour left today already has a movie, there is nothing left to plan, so
-  // tomorrow is planned instead (its audiences and awards are already in the save).
+  // actBlock is the hour the game is at. bBlockAwards marks the hours the AEFTA awards take;
+  // only today's row counts (tomorrow's awards show up once the game reaches that day).
   const SAVE_TODAY = 1;
   function importToday(root, pn, all) {
     const hours = PLAN_HOURS.length;
+    const aud = nrbfList(root['AUdayAudience' + SAVE_TODAY]);
     const blocks = nrbfList(root.AUdayBlock);
-    const act = Math.max(0, Math.min(hours - 1, root.actBlock | 0));
-    const dayRow = function (d) {
-      const row0 = d * 3 * hours + pn * hours;
-      return blocks.slice(row0, row0 + hours);
-    };
-    const today_set = dayRow(SAVE_TODAY).every(function (blk, b) {
-      return b < act || blk && (blk.bMovie >= 0 || blk.bBlockAwards);
-    });
-    const d = today_set && nrbfList(root['AUdayAudience' + (SAVE_TODAY + 1)]).length >= hours * 3 ? SAVE_TODAY + 1 : SAVE_TODAY;
-    const aud = nrbfList(root['AUdayAudience' + d]);
-    const res = {ok: false, locked: 0, bans: 0, awards: 0, tomorrow: d !== SAVE_TODAY};
+    const res = {ok: false, locked: 0, bans: 0, awards: 0};
     if (aud.length < hours * 3) {
       return res;
     }
     res.ok = true;
-    const mine = dayRow(d);
+    const row0 = SAVE_TODAY * 3 * hours + pn * hours;
+    const mine = blocks.slice(row0, row0 + hours);
     plan.aud = PLAN_HOURS.map(function (h, b) {
       const row = audiences.map(function () {
         return 0;
@@ -2715,7 +2778,7 @@ $(function () {
       return row;
     });
     // Lock what has aired (or is airing): one frozen slot per movie, from its first part.
-    const now = res.tomorrow ? 0 : act;
+    const now = Math.max(0, Math.min(hours - 1, root.actBlock | 0));
     const frozen = [];
     mine.forEach(function (blk, b) {
       if (!blk || !blk.bBlocked || !(blk.bMovie >= 0) || (blk.bNumeral | 0) > 1 && b > 0) {
@@ -2742,12 +2805,14 @@ $(function () {
     plan.pins = plan.pins.filter(function (x) {
       return x.start >= now;
     });
+    // An awards hour from an earlier load is not an event of the player's own.
+    const old_award = plan.award || [];
     plan.award = mine.map(function (blk) {
       return !!(blk && blk.bBlockAwards);
     });
     res.awards = plan.award.filter(Boolean).length;
     plan.event = plan.event.map(function (e, b) {
-      return plan.award[b] || b >= now && e;
+      return plan.award[b] || b >= now && e && !old_award[b];
     });
     plan.event_mv = plan.event_mv.map(function (x, b) {
       return plan.award[b] ? null : x;
@@ -2950,7 +3015,7 @@ $(function () {
       html += '<span class="gi_note">No active quest.</span>';
     } else {
       html += '<div class="gi_big">' + (q.g >= 0 ? gIcon(q.g) + genres[q.g] : 'Any genre') + ' &middot; ' + q.rating.toFixed(1) + '+</div>' +
-        '<span>Air it before <b>' + hourName(q.hour) + '</b>' +
+        '<span>Air it at <b>' + hourName(q.hour) + '</b>' +
         (q.minYear > 0 || (q.maxYear && q.maxYear < 2100) ? ', made ' + (q.minYear > 0 ? 'from ' + q.minYear : '') + (q.maxYear && q.maxYear < 2100 ? ' to ' + q.maxYear : '') : '') +
         '. Reward <b>' + money(q.gold) + '</b>' + (q.fame ? ' and ' + q.fame + ' fame' : '') + '.</span>';
       if (q.owned.length) {
@@ -3158,9 +3223,6 @@ $(function () {
     plan.save = {day: root.tDay | 0, channel: channel, operator: String(root['p' + pn + 'pName'] || ''), color: col[0], light: col[1]};
     plan.movies = sortMovies(list);
     const today = importToday(root, pn, all);
-    if (today.tomorrow) {
-      plan.save.day += 1;
-    }
     setSaveInfo(buildSaveInfo(root, pn, all));
     plan.pins = plan.pins.filter(function (x) {
       return ids.indexOf(x.id) >= 0;
@@ -3179,7 +3241,6 @@ $(function () {
     };
     return '<b>' + esc(root['p' + pn + 'pChannelName'] || 'Your channel') + '</b>, day ' + root.tDay + ' ' + pad(root.tHours | 0) + ':' + pad(root.tMinutes | 0) + ': loaded ' +
       (list.length - tvs) + ' movies and ' + tvs + ' TV shows' + (skipped ? ' (' + skipped + ' skipped)' : '') + '. ' +
-      (today.tomorrow ? 'Today is fully programmed, so this plans tomorrow (day ' + plan.save.day + '). ' : '') +
       (today.awards ? 'The AEFTA awards take ' + today.awards + ' hour' + (today.awards > 1 ? 's' : '') + ' (' + plan.award.map(function (a, b) {
         return a ? hourLabel(PLAN_HOURS[b]) : null;
       }).filter(Boolean).join(', ') + '). ' : '') +
