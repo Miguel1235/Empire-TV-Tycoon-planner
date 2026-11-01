@@ -1433,7 +1433,7 @@ $(function () {
       }
       const list = [];
       for (let gi = 0; gi < genres.length; ++gi) {
-        let min = Infinity;
+        let min = 4;
         let sum = 0;
         let weak = 5;
         for (let a = 0; a < audiences.length; ++a) {
@@ -1631,7 +1631,7 @@ $(function () {
     if (!ty.tags) {
       return info.byGi[ty.g].score;
     }
-    let min = Infinity;
+    let min = 4;
     let sum = 0;
     for (let a = 0; a < audiences.length; ++a) {
       if (mask & (1 << a)) {
@@ -1938,19 +1938,25 @@ $(function () {
   // One merged cell per movie: it spans every hour the movie takes and is tinted
   // with the color of its weakest rating.
   // The slot that completes today's quest: the one on air at the quest's hour with a movie
-  // (not a TV show) the savegame lists as fitting it. -1 when none does.
+  // or TV show the savegame lists as fitting it. -1 when none does.
+  // The save writes midnight as 24; the planner's hours run 15 to 2.
+  function questHourIndex(q) {
+    return PLAN_HOURS.indexOf(q.hour % 24);
+  }
+  function questFits(q) {
+    const fits = {};
+    q.owned.forEach(function (mo) {
+      fits[mo.name] = true;
+    });
+    return fits;
+  }
   function questSlot(slots) {
     const q = save_info && save_info.quest;
     if (!q || !plan.save) {
       return -1;
     }
-    const fits = {};
-    q.owned.forEach(function (mo) {
-      if (!(mo.tags & TAG_TV)) {
-        fits[mo.name] = true;
-      }
-    });
-    const at = PLAN_HOURS.indexOf(q.hour);
+    const fits = questFits(q);
+    const at = questHourIndex(q);
     let found = -1;
     slots.forEach(function (s) {
       const name = s.ev || s.gi === null ? '' : s.lib && s.mi >= 0 ? plan.movies[s.mi].name : s.frozen ? s.name : '';
@@ -1967,13 +1973,8 @@ $(function () {
     if (!q || !plan.save || questSlot(day.slots) >= 0) {
       return day;
     }
-    const fits = {};
-    q.owned.forEach(function (mo) {
-      if (!(mo.tags & TAG_TV)) {
-        fits[mo.name] = true;
-      }
-    });
-    const at = PLAN_HOURS.indexOf(q.hour);
+    const fits = questFits(q);
+    const at = questHourIndex(q);
     const pins = plan.pins.slice();
     let best = null;
     let best_q = -Infinity;
@@ -2969,10 +2970,7 @@ $(function () {
     });
     return info;
   }
-  // Points the planner gives each rating (unknown, E, D, C, B, A): a very happy face (A) is
-  // worth far more than a B, so it pulls hard on the plan.
-  const RATING_POINTS = [0, 1, 2, 3, 4, 7];
-  // Fan loyalty as scoring weights: each group's rating points are scaled by 1 + fans / 100.
+  // Fan loyalty as scoring weights: each group's ratings are scaled by 1 + fans / 100.
   function fanWeights() {
     if (!use_fans || !save_info || !save_info.fans || save_info.fans.length !== audiences.length) {
       return null;
@@ -2983,9 +2981,12 @@ $(function () {
   }
   function scoreRatings(d) {
     const w = fanWeights();
+    if (!w) {
+      return d;
+    }
     const scaled = d.map(function (row) {
       return row.map(function (c, a) {
-        return [c[0], (RATING_POINTS[c[1]] || 0) * (w ? w[a] : 1)];
+        return [c[0], c[1] * w[a]];
       });
     });
     scaled.raw = d;
@@ -3033,16 +3034,13 @@ $(function () {
     });
     // Quest
     const q = info.quest;
-    const q_movie = q && q.owned.some(function (mo) {
-      return !(mo.tags & TAG_TV);
-    });
-    const q_state = !q ? '' : q_movie ? '<span class="gi_tag ok">You can do it</span>' : q.owned.length ? '<span class="gi_tag">Only a TV show fits</span>' : '<span class="gi_tag warn">Need a movie</span>';
+    const q_state = !q ? '' : q.owned.length ? '<span class="gi_tag ok">You can do it</span>' : '<span class="gi_tag warn">Need a movie</span>';
     let html = '<h3>Quest' + q_state + '</h3>';
     if (!q) {
       html += '<span class="gi_note">No active quest.</span>';
     } else {
       html += '<div class="gi_big">' + (q.g >= 0 ? gIcon(q.g) + genres[q.g] : 'Any genre') + ' &middot; ' + q.rating.toFixed(1) + '+</div>' +
-        '<span>Air it at <b>' + hourName(q.hour) + '</b>' +
+        '<span>Air it at <b>' + hourName(q.hour % 24) + '</b>' +
         (q.minYear > 0 || (q.maxYear && q.maxYear < 2100) ? ', made ' + (q.minYear > 0 ? 'from ' + q.minYear : '') + (q.maxYear && q.maxYear < 2100 ? ' to ' + q.maxYear : '') : '') +
         '. Reward <b>' + money(q.gold) + '</b>' + (q.fame ? ' and ' + q.fame + ' fame' : '') + '.</span>';
       if (q.owned.length) {
