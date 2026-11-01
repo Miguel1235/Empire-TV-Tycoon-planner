@@ -456,6 +456,11 @@ td.mv.mv_r5 { background: var(--t5); }
 .gi_grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; }
 .gi_card { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 10px; background: var(--black); border: 2px solid var(--slate-hi); font-size: 13px; line-height: 1.4; color: var(--soft); }
 .gi_card h3 { margin: 0; display: flex; align-items: center; gap: 8px; font: 700 10px/1.2 var(--font-pixel); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
+.gi_card h3 { cursor: pointer; user-select: none; }
+.gi_card h3::after { content: '\25BE'; margin-left: auto; font-size: 12px; color: var(--soft); }
+.gi_card h3:has(.gi_tag)::after { margin-left: 0; }
+.gi_card.shut h3::after { content: '\25B8'; }
+.gi_card.shut > :not(h3) { display: none; }
 .gi_card h3 .gi_tag { margin-left: auto; padding: 3px 6px; font-size: 9px; color: #fff; background: var(--slate-hi); letter-spacing: 0.04em; }
 .gi_card h3 .gi_tag.ok { background: var(--green); }
 .gi_card h3 .gi_tag.warn { background: var(--red); }
@@ -505,7 +510,7 @@ td.mv.mv_r5 { background: var(--t5); }
 .buy_row button { padding: 6px 10px; font: 700 9px/1 var(--font-pixel); text-transform: uppercase; color: #fff; background: var(--green); border: 2px solid var(--black); cursor: pointer; }
 .mv_s.pink { color: #c25aa8; }
 .bang { flex: none; font: 700 24px/1 var(--font-pixel); color: #e24ac8; text-shadow: 2px 2px 0 #000; }
-#planner_wrap td.aud { width: 330px; padding: 6px 8px; background: #1d2023; }
+#planner_wrap td.aud { width: 200px; padding: 6px 8px; background: #1d2023; }
 .chips { display: flex; gap: 6px; flex-wrap: nowrap; }
 .chip { position: relative; flex: none; width: 32px; height: 33px; padding: 2px; background: transparent; border: 0; cursor: pointer; }
 .chip img { display: block; width: 28px; height: 29px; image-rendering: pixelated; }
@@ -665,10 +670,6 @@ tr.cur td.blk .hour { color: #fff; }
         <span class="sb_it"><b id="sb_mv">0</b><small>Movies</small></span>
         <span class="sb_it"><b id="sb_tv">0</b><small>TV shows</small></span>
       </div>
-    </div>
-    <div class="notice">
-      <span class="bang" aria-hidden="true">!</span>
-      <p>Type the first letter of an audience (M, W, C, E, L, R, A, G) to mark it in the highlighted hour, then press <b>Enter</b> for the next hour (<b>Shift</b>+<b>Enter</b> goes back; the <b>Up</b> and <b>Down</b> arrows also move between hours). <b>Backspace</b> or <b>Delete</b> takes back your last audience change. <b>Shift</b>+letter bans it, up to the bans you have today (usually 3; set 1, 2 or 3 next to the ban counter). Tapping works too: once to mark, twice to ban, three times to clear. Mark an hour as <b>Event</b> when a fixed event takes it. The pin in a movie's corner forces one of your movies there (it overrides the suggestion), and the one on an Event shows a movie of yours during it. Set <b>Now</b> to the hour the game is at: movies that already started are locked and only the rest of the day is re-planned. Set <b>Cut at</b> to an hour and no movie runs past it: every movie ends there or earlier (a cut at 18.00 means a movie can never cover both 17.00 and 18.00). Drag the <b>Now</b> and <b>Cut</b> markers on the right edge of the chart to change those hours (the arrow keys work on them too; the Cut marker at the bottom means no cut). The <b>Ideal</b> column shows the best plan if you owned every movie: any genre, any length, still respecting events and the cut. Movies are packed into 3-block slots first, then 2, then 1. Your movies, audiences, aired hours and the day all come from your savegame.</p>
     </div>
     <div class="toolbar">
       <div class="seg" role="group" aria-label="Fit preference">
@@ -2193,7 +2194,7 @@ $(function () {
     const html = ['<table><tr>' +
       '<th><div class="th_in">Blocks<span class="q" title="Hours of the day. Mark one as Event when a fixed event takes it.">?</span></div></th>' +
       '<th><div class="th_in">Movies<span class="q" title="' + (plan.movies.length ? 'Your movies, placed where they score best. Each one airs once.' : 'The best genre for each movie slot, packed 3, then 2, then 1 blocks.') + '">?</span></div></th>' +
-      '<th><div class="th_in">Audience<span class="q" title="Tap to mark present, tap again to ban, tap once more to clear.">?</span></div></th>' +
+      '<th><div class="th_in">Audience<span class="q" title="The audiences watching each hour, from your savegame.">?</span></div></th>' +
       '<th><div class="th_in">Ideal<span class="q" title="The best plan if you owned every movie: any genre and any length (3, then 2, then 1 blocks), respecting events and the cut.">?</span></div></th>' +
       '</tr>'];
     const lock = lockEnd();
@@ -2230,11 +2231,11 @@ $(function () {
         tr += slotRow(slot_of[b].s, scorer);
       }
       tr += '<td class="aud"><div class="chips">';
-      // Marked and banned audiences move to the front of the row; the rest keep their order.
+      // Only the marked and banned audiences of the hour are shown.
       const order = audiences.map(function (n, a) {
         return a;
-      }).sort(function (x, y) {
-        return (plan.aud[b][y] > 0) - (plan.aud[b][x] > 0) || x - y;
+      }).filter(function (a) {
+        return plan.aud[b][a] > 0;
       });
       for (let oi = 0; oi < order.length; ++oi) {
         const a = order[oi];
@@ -3086,6 +3087,26 @@ $(function () {
       }).join('') + '</table></div>';
     $('#gi_market').html(html);
   }
+  // Tapping a card's title folds it; which cards are folded is remembered in this browser.
+  const GI_SHUT_KEY = 'empiretv_gi_shut';
+  let gi_shut = {};
+  try {
+    gi_shut = JSON.parse(localStorage.getItem(GI_SHUT_KEY)) || {};
+  } catch (e) {
+    gi_shut = {};
+  }
+  $('#gi .gi_card').each(function () {
+    $(this).toggleClass('shut', !!gi_shut[this.id]);
+  });
+  $('#gi').on('click', '.gi_card > h3', function () {
+    const card = $(this).parent().toggleClass('shut');
+    gi_shut[card.attr('id')] = card.hasClass('shut');
+    try {
+      localStorage.setItem(GI_SHUT_KEY, JSON.stringify(gi_shut));
+    } catch (e) {
+      // Folding still works for this visit.
+    }
+  });
   $('#gi').on('change', '#gi_usefans', function () {
     use_fans = this.checked;
     try {
@@ -3180,12 +3201,14 @@ $(function () {
       msg.addClass('err').text('Could not read ' + file.name + ': ' + (e && e.message ? e.message : e));
     });
   }
-  // ---- Save folder watcher -----------------------------------------------------
+  // ---- Save watcher ------------------------------------------------------------
   // Uses the File System Access API (Chrome, Edge, Opera). The game writes manual saves
-  // (saveGame-N.etv) and daily autosaves (saveGame-autoDayN.etv) to its savegames folder;
-  // the watcher checks the folder every 2 seconds and loads the save written last.
-  // The folder is remembered in IndexedDB so it can be resumed after a reload.
+  // (saveGame-N.etv) and daily autosaves (saveGame-autoDayN.etv) to its savegames folder.
+  // A watched folder is checked every 2 seconds and the save written last is loaded; a
+  // watched file (picked with Load savegame or dropped) is reloaded whenever it changes.
+  // The folder or file is remembered in IndexedDB so it can be resumed after a reload.
   const can_watch = typeof window.showDirectoryPicker === 'function';
+  const can_pick = typeof window.showOpenFilePicker === 'function';
   const WATCH_MS = 2000;
   let watch = null;
   let remembered = null;
@@ -3232,15 +3255,18 @@ $(function () {
     }
     return best;
   }
+  function srcLabel(h) {
+    return (h.kind === 'file' ? 'File: ' : 'Folder: ') + h.name;
+  }
   function clock(t) {
     return new Date(t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
   }
   function updateWatchUi() {
     $('#sv_watch').prop('hidden', !can_watch).toggleClass('watching', !!watch)
       .find('b').text(watch ? 'Stop watching' : 'Watch save folder');
-    $('#sv_watch small').text(watch ? 'Folder: ' + watch.dir.name : 'Reload when the game saves');
+    $('#sv_watch small').text(watch ? srcLabel(watch.dir) : 'Reload when the game saves');
     $('#sv_resume').prop('hidden', !can_watch || !!watch || !remembered);
-    $('#sv_resume_nm').text(remembered ? 'Folder: ' + remembered.name : '');
+    $('#sv_resume_nm').text(remembered ? srcLabel(remembered) : '');
   }
   function stopWatch() {
     if (watch) {
@@ -3257,7 +3283,7 @@ $(function () {
     w.busy = true;
     const msg = $('#sv_msg');
     try {
-      const file = await newestSave(w.dir);
+      const file = w.dir.kind === 'file' ? await w.dir.getFile() : await newestSave(w.dir);
       if (!file) {
         msg.addClass('err').html('Watching <b>' + esc(w.dir.name) + '</b>, but it holds no .etv saves. Pick the game\'s <b>savegames</b> folder.');
       } else {
@@ -3267,14 +3293,16 @@ $(function () {
           w.key = key;
           w.fails = 0;
           if (watch === w) {
-            msg.removeClass('err').html(html + '<br>Watching <b>' + esc(w.dir.name) + '</b>: ' + esc(file.name) + ', reloaded at ' + clock(Date.now()) + '.');
+            msg.removeClass('err').html(html + '<br>Watching <b>' + esc(w.dir.name) + '</b>' + (w.dir.kind === 'file' ? '' : ': ' + esc(file.name)) + ', reloaded at ' + clock(Date.now()) + '.');
           }
         }
       }
     } catch (e) {
-      if (e && (e.name === 'NotAllowedError' || e.name === 'NotFoundError' || e.name === 'SecurityError')) {
+      // A watched file can vanish for a moment while the game replaces it, so only a
+      // missing folder stops the watch.
+      if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || (e.name === 'NotFoundError' && w.dir.kind !== 'file'))) {
         stopWatch();
-        msg.addClass('err').text('Stopped watching: the folder is no longer readable (' + e.message + ').');
+        msg.addClass('err').text('Stopped watching: ' + (w.dir.kind === 'file' ? 'the save' : 'the folder') + ' is no longer readable (' + e.message + ').');
       } else if (++w.fails >= 5) {
         // A save caught halfway through being written fails to parse; the next check retries.
         msg.addClass('err').text('Watching ' + w.dir.name + ', but the newest save could not be read: ' + (e && e.message ? e.message : e));
@@ -3286,7 +3314,7 @@ $(function () {
   async function startWatch(dir) {
     if (dir.queryPermission && await dir.queryPermission({mode: 'read'}) !== 'granted' &&
       await dir.requestPermission({mode: 'read'}) !== 'granted') {
-      $('#sv_msg').addClass('err').text('Permission to read the folder was not given.');
+      $('#sv_msg').addClass('err').text('Permission to read ' + (dir.kind === 'file' ? 'the save' : 'the folder') + ' was not given.');
       return;
     }
     stopWatch();
@@ -3326,14 +3354,29 @@ $(function () {
     idbHandle('readonly', function (st) {
       return st.get('dir');
     }).then(function (h) {
-      if (h && h.kind === 'directory') {
+      if (h && (h.kind === 'directory' || h.kind === 'file')) {
         remembered = h;
         updateWatchUi();
       }
     }).catch(function () {});
   }
+  // Where the browser can keep a handle to the picked file, it is watched so it reloads
+  // every time the game saves over it; elsewhere it is read once.
+  if (can_pick) {
+    $('#sv_btn small').text('Reloads when the game saves');
+  }
   $('#sv_btn').on('click', function () {
-    $('#sv_file').val('').trigger('click');
+    if (!can_pick) {
+      $('#sv_file').val('').trigger('click');
+      return;
+    }
+    window.showOpenFilePicker({id: 'empiretv_saves', types: [{description: 'Empire TV savegame', accept: {'application/octet-stream': ['.etv']}}]}).then(function (hs) {
+      return startWatch(hs[0]);
+    }).catch(function (e) {
+      if (e && e.name !== 'AbortError') {
+        $('#sv_msg').addClass('err').text('Could not open the save: ' + (e.message || e));
+      }
+    });
   });
   $('#sv_file').on('change', function () {
     loadSaveFile(this.files[0]);
@@ -3345,7 +3388,20 @@ $(function () {
     ev.preventDefault();
     $(this).removeClass('drag');
     if (ev.type === 'drop') {
-      loadSaveFile(ev.originalEvent.dataTransfer.files[0]);
+      const dt = ev.originalEvent.dataTransfer;
+      const item = dt.items && dt.items[0];
+      // The handle has to be asked for while the drop event is still running.
+      const hp = can_watch && item && item.kind === 'file' && item.getAsFileSystemHandle ? item.getAsFileSystemHandle() : null;
+      const file = dt.files[0];
+      if (!hp) {
+        loadSaveFile(file);
+        return;
+      }
+      hp.then(function (h) {
+        return h ? startWatch(h) : loadSaveFile(file);
+      }).catch(function () {
+        loadSaveFile(file);
+      });
     }
   });
   // ---- Days ---------------------------------------------------------------------
