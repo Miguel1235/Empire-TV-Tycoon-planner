@@ -718,7 +718,7 @@ tr.cur td.blk .hour { color: #fff; }
         <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): Mid ones count a bit less and Low ones much less, so a fresh movie of another genre can take their slot. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 (children avoid it), XXX (only from 23.00), Glamour, Cartoon and Anime.</span>
       </div>
       <div class="lib_add lib_import" id="sv_drop">
-        <button type="button" class="btn green slim" id="sv_btn"><b>Load savegame</b><small>Fill the list from a .etv file</small></button>
+        <button type="button" class="btn green slim" id="sv_btn"><b>Load savegame</b><small>Reloads when the game saves</small></button>
         <input id="sv_file" type="file" accept=".etv" hidden>
         <button type="button" class="btn slate slim" id="sv_watch" hidden><b>Watch save folder</b><small>Reload when the game saves</small></button>
         <button type="button" class="btn slate slim" id="sv_resume" hidden><b>Resume watching</b><small id="sv_resume_nm"></small></button>
@@ -3194,12 +3194,26 @@ $(function () {
     if (!file) {
       return;
     }
-    const msg = $('#sv_msg').removeClass('err').text('Reading ' + file.name + '...');
-    file.arrayBuffer().then(function (buf) {
-      msg.html(importSave(parseNrbf(buf)));
-    }).catch(function (e) {
-      msg.addClass('err').text('Could not read ' + file.name + ': ' + (e && e.message ? e.message : e));
+    // Without file handles (Firefox) the picked File itself is watched: reading it again
+    // returns what is on disk now, so changes are spotted by comparing its contents.
+    startWatch({kind: 'file', name: file.name, blob: true, getFile: function () {
+      return Promise.resolve(file);
+    }}).catch(function (e) {
+      $('#sv_msg').addClass('err').text('Could not read ' + file.name + ': ' + (e && e.message ? e.message : e));
     });
+  }
+  function bytesKey(buf) {
+    const n = buf.byteLength;
+    const words = new Int32Array(buf, 0, n >> 2);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < words.length; ++i) {
+      h = Math.imul(h ^ words[i], 16777619);
+    }
+    const tail = new Uint8Array(buf, n & ~3);
+    for (let i = 0; i < tail.length; ++i) {
+      h = Math.imul(h ^ tail[i], 16777619);
+    }
+    return n + '|' + (h >>> 0);
   }
   // ---- Save watcher ------------------------------------------------------------
   // Uses the File System Access API (Chrome, Edge, Opera). The game writes manual saves
@@ -3262,7 +3276,7 @@ $(function () {
     return new Date(t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
   }
   function updateWatchUi() {
-    $('#sv_watch').prop('hidden', !can_watch).toggleClass('watching', !!watch)
+    $('#sv_watch').prop('hidden', !can_watch && !watch).toggleClass('watching', !!watch)
       .find('b').text(watch ? 'Stop watching' : 'Watch save folder');
     $('#sv_watch small').text(watch ? srcLabel(watch.dir) : 'Reload when the game saves');
     $('#sv_resume').prop('hidden', !can_watch || !!watch || !remembered);
@@ -3287,9 +3301,10 @@ $(function () {
       if (!file) {
         msg.addClass('err').html('Watching <b>' + esc(w.dir.name) + '</b>, but it holds no .etv saves. Pick the game\'s <b>savegames</b> folder.');
       } else {
-        const key = file.name + '|' + file.lastModified + '|' + file.size;
+        const buf = w.dir.blob ? await file.arrayBuffer() : null;
+        const key = buf ? bytesKey(buf) : file.name + '|' + file.lastModified + '|' + file.size;
         if (force || key !== w.key) {
-          const html = importSave(parseNrbf(await file.arrayBuffer()));
+          const html = importSave(parseNrbf(buf || await file.arrayBuffer()));
           w.key = key;
           w.fails = 0;
           if (watch === w) {
@@ -3319,10 +3334,12 @@ $(function () {
     }
     stopWatch();
     watch = {dir: dir, key: null, busy: false, fails: 0, timer: setInterval(pollWatch, WATCH_MS)};
-    remembered = dir;
-    idbHandle('readwrite', function (st) {
-      return st.put(dir, 'dir');
-    }).catch(function () {});
+    if (!dir.blob) {
+      remembered = dir;
+      idbHandle('readwrite', function (st) {
+        return st.put(dir, 'dir');
+      }).catch(function () {});
+    }
     updateWatchUi();
     $('#sv_msg').removeClass('err').html('Watching <b>' + esc(dir.name) + '</b>...');
     await pollWatch(true);
@@ -3362,9 +3379,6 @@ $(function () {
   }
   // Where the browser can keep a handle to the picked file, it is watched so it reloads
   // every time the game saves over it; elsewhere it is read once.
-  if (can_pick) {
-    $('#sv_btn small').text('Reloads when the game saves');
-  }
   $('#sv_btn').on('click', function () {
     if (!can_pick) {
       $('#sv_file').val('').trigger('click');
