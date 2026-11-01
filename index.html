@@ -781,7 +781,7 @@ tr.cur td.blk .hour { color: #fff; }
     <div class="lib" id="lib">
       <div class="lib_top">
         <span class="lib_title">My movies</span>
-        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): Mid ones count a bit less and Low ones much less, so a fresh movie of another genre can take their slot. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 (children avoid it), XXX (only from 23.00), Glamour, Cartoon and Anime.</span>
+        <span class="lib_hint">The movies you own in the game, read from your savegame. Only those get scheduled, each one once. Fresher movies win (freshness is read from your savegame): only High ones (70% and up) count in full, so a Mid or Low movie airs only when no fresh one fits. Between equal movies the higher rating (0 to 10) airs first. Tags change how each audience takes a movie: TV show +25% per episode already aired, Cult +10%, +16 (children avoid it), XXX (only from 23.00), Glamour, Cartoon and Anime.</span>
       </div>
       <div class="lib_list" id="lib_list"></div>
     </div>
@@ -1428,7 +1428,7 @@ $(function () {
       }
       const list = [];
       for (let gi = 0; gi < genres.length; ++gi) {
-        let min = 4;
+        let min = Infinity;
         let sum = 0;
         let weak = 5;
         for (let a = 0; a < audiences.length; ++a) {
@@ -1453,12 +1453,14 @@ $(function () {
   }
   // Value of one movie slot from its genre score. "long": 3-block slots outrank 2-block
   // slots, which outrank genre quality. "best": genre quality first, longer slots only break ties.
-  function slotValueScore(mode, len, score) {
+  // A stale movie (below High freshness) never gets the length bonus, so its length cannot
+  // win it a slot over a fresh movie.
+  function slotValueScore(mode, len, score, stale) {
     const q = score * len;
     if (mode === 'best') {
-      return q * 100 + (len === 3 ? 10 : 0) + (len === 2 ? 1 : 0);
+      return q * 100 + (stale ? 0 : (len === 3 ? 10 : 0) + (len === 2 ? 1 : 0));
     }
-    return (len === 3 ? 1000000 : 0) + (len === 2 ? 10000 : 0) + q;
+    return (stale ? 0 : (len === 3 ? 1000000 : 0) + (len === 2 ? 10000 : 0)) + q;
   }
   // Free planning (no movie list): any genre fits any slot.
   function solvePlan(masks, events, mode, scorer) {
@@ -1528,7 +1530,8 @@ $(function () {
     ['#e4985b', 1], ['#5252a1', 0], ['#5b5b5d', 0], ['#835317', 0], ['#6a6a6a', 0], ['#d12da5', 0],
     ['#b4b4b5', 1], ['#6e6e78', 0], ['#dc1921', 0], ['#0c7634', 0], ['#fb6200', 1], ['#189748', 0],
   ];
-  const FRESH_FACTOR = [0.6, 0.85, 1];
+  // Only High (70% and up) counts in full; a Mid or Low movie airs only when nothing fresh fits.
+  const FRESH_FACTOR = [0.15, 0.4, 1];
   // ---- Movie tags ---------------------------------------------------------------
   // Each tag changes how well an audience group takes the movie, in percent of that group's
   // rating, and some tags raise the whole audience. Levels: huge 50, big 25, bonus 10,
@@ -1615,7 +1618,7 @@ $(function () {
     if (!ty.tags) {
       return info.byGi[ty.g].score;
     }
-    let min = 4;
+    let min = Infinity;
     let sum = 0;
     for (let a = 0; a < audiences.length; ++a) {
       if (mask & (1 << a)) {
@@ -1748,7 +1751,7 @@ $(function () {
         for (let t = 0; t < T; ++t) {
           const b = base[t][i];
           if (b !== null && cs[t]) {
-            const r = slotValueScore(mode, pool[t].len, b * rateFactor(pool[t].ratings[0])) + rel[i + pool[t].len];
+            const r = slotValueScore(mode, pool[t].len, b * rateFactor(pool[t].ratings[0]), pool[t].f < 2) + rel[i + pool[t].len];
             if (r > v) {
               v = r;
             }
@@ -1783,7 +1786,7 @@ $(function () {
         const b = base[t][i];
         if (b !== null && cs[t]) {
           const ty = pool[t];
-          const val = slotValueScore(mode, ty.len, b * rateFactor(ty.ratings[ty.ratings.length - cs[t]]));
+          const val = slotValueScore(mode, ty.len, b * rateFactor(ty.ratings[ty.ratings.length - cs[t]]), ty.f < 2);
           cand.push({t: t, val: val, opt: val + rel[i + ty.len]});
         }
       }
@@ -2942,7 +2945,10 @@ $(function () {
     });
     return info;
   }
-  // Fan loyalty as scoring weights: each group's ratings are scaled by 1 + fans / 100.
+  // Points the planner gives each rating (unknown, E, D, C, B, A): a very happy face (A) is
+  // worth far more than a B, so it pulls hard on the plan.
+  const RATING_POINTS = [0, 1, 2, 3, 4, 7];
+  // Fan loyalty as scoring weights: each group's rating points are scaled by 1 + fans / 100.
   function fanWeights() {
     if (!use_fans || !save_info || !save_info.fans || save_info.fans.length !== audiences.length) {
       return null;
@@ -2953,12 +2959,9 @@ $(function () {
   }
   function scoreRatings(d) {
     const w = fanWeights();
-    if (!w) {
-      return d;
-    }
     const scaled = d.map(function (row) {
       return row.map(function (c, a) {
-        return [c[0], c[1] * w[a]];
+        return [c[0], (RATING_POINTS[c[1]] || 0) * (w ? w[a] : 1)];
       });
     });
     scaled.raw = d;
