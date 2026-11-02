@@ -225,6 +225,7 @@ h1 span { color: var(--gold); }
 .click_wrap img.rating { width: 38px; height: 38px; }
 .click_wrap { position: relative; }
 .click_wrap img.verified { width: 20px; height: 20px; }
+.click_wrap .exact { min-width: 15px; font: 700 11px/1 var(--font-pixel); color: var(--ink); text-align: center; }
 .click_wrap img.modified { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; pointer-events: none; }
 .clickable { cursor: pointer; }
 img[src^="data:image/png"] { image-rendering: pixelated; }
@@ -1119,6 +1120,7 @@ $(function () {
             '') +
           '<img src="' + icon(ratings[elem[1]]) + '" alt="' + (ratings[elem[1]] === 'unknown' ? 'not rated' : ratings[elem[1]].toUpperCase()) + '" class="' + clickable + 'rating"' +
           ' id="rating_' + ii + '_' + jj + '">' +
+          (edit_mode && elem[2] ? '<span class="exact" title="Exact value from your savegame (2 to 10)">' + elem[2] + '</span>' : '') +
           // a rated cell that differs from the default chart gets a pencil mark
           (edit_mode && elem[1] && default_data[ii] && elem[1] !== default_data[ii][jj][1] ?
             '<img src="' + modified_src + '" alt="changed" class="modified" title="Changed from the default (' + ratings[default_data[ii][jj][1]].toUpperCase() + ')">' : '') +
@@ -1234,6 +1236,10 @@ $(function () {
         let aud = idx[2];
         let elem = data[genre][aud];
         elem[type] = (elem[type] + 1) % max_value[type];
+        if (type === 1) {
+          // a rating set by hand no longer has the save's exact number
+          elem.length = 2;
+        }
         let src = elemSrc(genre, aud);
         if (src) {
           img.parentElement.parentElement.innerHTML = src;
@@ -1439,7 +1445,43 @@ $(function () {
     return (h < 10 ? '0' : '') + h + '.00';
   }
   // Ratings used by the planner: the ones saved in edit mode, otherwise the chart defaults.
+  // Copies the save's audience tastes into Edit ratings when they differ from what is stored
+  // there. Each cell keeps the A-E rating and the exact 2-10 number from the save. A cell you
+  // ticked as checked is yours and is never overwritten: the game can rate an audience
+  // differently from the save's table, and your check is what you saw in the game.
+  // Returns how many cells changed.
+  function syncEditRatings(tastes) {
+    if (!tastes || tastes.length !== genres.length) {
+      return 0;
+    }
+    let cur = [];
+    try {
+      cur = JSON.parse(unescape(readLocal() || '[]'));
+    } catch (e) {
+      cur = [];
+    }
+    let changed = 0;
+    const next = tastes.map(function (row, gi) {
+      return row.map(function (v, a) {
+        const old = cur[gi] && cur[gi][a];
+        const tier = Math.max(1, Math.min(5, Math.ceil(v / 2)));
+        if (old && (old[0] || old[1] === tier && old[2] === v)) {
+          return old;
+        }
+        ++changed;
+        return [0, tier, v];
+      });
+    });
+    if (changed) {
+      writeLocal(JSON.stringify(next));
+    }
+    return changed;
+  }
+  // With a savegame loaded, the audience tastes come from it (2 to 10, so a 10 beats a 9);
+  // a rating you ticked as checked in Edit ratings still wins over the save. Without a
+  // save: your edited ratings, otherwise the chart defaults.
   function plannerRatings() {
+    let edited = null;
     try {
       const r = JSON.parse(unescape(readLocal() || '[]'));
       if (r.length === genres.length && r.some(function (row) {
@@ -1447,10 +1489,40 @@ $(function () {
           return c[1] > 0;
         });
       })) {
-        return {d: r, src: 'your edited ratings'};
+        edited = r;
       }
     } catch (e) {
       // use the defaults
+    }
+    const tastes = save_info && save_info.tastes;
+    if (tastes && tastes.length === genres.length) {
+      let own = 0;
+      const pick = function (gi, a) {
+        const c = edited && edited[gi] && edited[gi][a];
+        return c && c[0] && c[1] > 0 ? c : null;
+      };
+      // d holds the planner's values (the save's 2-10 halved, so 1-5 like A-E); raw holds
+      // the A-E rating shown on the faces.
+      const d = tastes.map(function (row, gi) {
+        return row.map(function (v, a) {
+          const c = pick(gi, a);
+          if (c) {
+            ++own;
+            return [1, c[1]];
+          }
+          return [0, v / 2];
+        });
+      });
+      d.raw = tastes.map(function (row, gi) {
+        return row.map(function (v, a) {
+          const c = pick(gi, a);
+          return [0, c ? c[1] : Math.max(1, Math.min(5, Math.ceil(v / 2)))];
+        });
+      });
+      return {d: d, src: 'your savegame' + (own ? ' (and ' + own + ' rating' + (own > 1 ? 's' : '') + ' you checked)' : '')};
+    }
+    if (edited) {
+      return {d: edited, src: 'your edited ratings'};
     }
     return {d: default_data, src: 'the chart defaults'};
   }
@@ -2988,6 +3060,18 @@ $(function () {
   function buildSaveInfo(root, pn, all) {
     const P = 'p' + pn;
     const info = {day: root.tDay | 0, time: root.tHours + ':' + (root.tMinutes < 10 ? '0' : '') + root.tMinutes};
+    // Audience tastes: aVgGc holds 8 audiences x 12 game genres, 2 (hated) to 10 (favourite).
+    // Pairs match the chart: 9-10 A, 7-8 B, 5-6 C, 3-4 D, 2 E.
+    const tv = Array.isArray(root.aVgGc) ? root.aVgGc : nrbfList(root.aVgGc);
+    if (tv.length === 96) {
+      info.tastes = genres.map(function (name, gi) {
+        const sg = SAVE_GENRES.indexOf(gi);
+        return audiences.map(function (n, a) {
+          const v = Number(tv[a * 12 + sg]);
+          return v >= 1 && v <= 10 ? v : 2;
+        });
+      });
+    }
     // Quest: air a movie of a genre (-1 any) rated at least qRating, from qMinYear to
     // qMaxYear, before hour qTime.
     const qi = root[P + 'pQuestActive'];
@@ -3085,7 +3169,7 @@ $(function () {
         return [c[0], c[1] * w[a]];
       });
     });
-    scaled.raw = d;
+    scaled.raw = d.raw || d;
     return scaled;
   }
   function money(n) {
@@ -3345,6 +3429,10 @@ $(function () {
     plan.movies = sortMovies(list);
     const today = importToday(root, pn, all);
     setSaveInfo(buildSaveInfo(root, pn, all));
+    const tastes_changed = syncEditRatings(save_info.tastes);
+    if (tastes_changed && edit_mode) {
+      getData();
+    }
     plan.pins = plan.pins.filter(function (x) {
       return ids.indexOf(x.id) >= 0;
     });
@@ -3366,7 +3454,8 @@ $(function () {
         return a ? hourLabel(PLAN_HOURS[b]) : null;
       }).filter(Boolean).join(', ') + '). ' : '') +
       (today.ok ? 'Audiences filled for all ' + PLAN_HOURS.length + ' hours' + (today.locked ? ', ' + today.locked + ' aired hour' + (today.locked > 1 ? 's' : '') + ' locked' : '') +
-        (today.bans ? ', ' + today.bans + ' ban' + (today.bans > 1 ? 's' : '') + ' from the game' : '') + '.' : 'No audience data for today in this save.');
+        (today.bans ? ', ' + today.bans + ' ban' + (today.bans > 1 ? 's' : '') + ' from the game' : '') + '.' : 'No audience data for today in this save.') +
+      (tastes_changed ? ' Audience tastes copied to Edit ratings (' + tastes_changed + ' rating' + (tastes_changed > 1 ? 's' : '') + ' updated).' : '');
   }
   function loadSaveFile(file) {
     if (!file) {
